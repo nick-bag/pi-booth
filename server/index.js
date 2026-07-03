@@ -146,6 +146,14 @@ async function applyTemplate(filepath) {
 
 // --- Routes ---
 
+// GET /cert - download the self-signed SSL cert for iPad trust installation
+app.get('/cert', (req, res) => {
+  if (!existsSync(CERT_PATH)) return res.status(404).send('Certificate not found');
+  res.setHeader('Content-Type', 'application/x-x509-ca-cert');
+  res.setHeader('Content-Disposition', 'attachment; filename="pi-booth.crt"');
+  res.sendFile(CERT_PATH);
+});
+
 // GET /config - send safe config to frontend
 app.get('/config', (req, res) => {
   res.json({
