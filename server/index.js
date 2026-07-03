@@ -105,13 +105,15 @@ async function buildCollageStrip(imagePaths) {
 }
 
 // Print via CUPS
-async function printFile(filepath, copies = 1) {
+async function printFile(filepath, copies = 1, type = 'single') {
   const printer = config.print.printer;
   // imagetoraster filter can't handle JPEG — convert to PNG first
   const tmpPng = filepath.replace(/\.(jpg|jpeg)$/i, `_print_tmp_${Date.now()}.png`);
   await execAsync(`convert "${filepath}" "${tmpPng}"`);
+  // Use correct media size: collage strip = 2x6 (w288h432-div2), single = 4x6 (w288h432)
+  const mediaSize = type === 'collage' ? 'w288h432-div2' : 'w288h432';
   try {
-    await execAsync(`lp -d "${printer}" -n ${copies} "${tmpPng}"`);
+    await execAsync(`lp -d "${printer}" -n ${copies} -o PageSize=${mediaSize} "${tmpPng}"`);
   } finally {
     await unlink(tmpPng).catch(() => {});
   }
@@ -256,7 +258,7 @@ app.post('/print', async (req, res) => {
     }
 
     const copies = type === 'collage' ? config.print.collagePrintCopies : config.print.singlePrintCopies;
-    await printFile(fileToPrint, copies);
+    await printFile(fileToPrint, copies, type);
     if (tempPath) await unlink(tempPath);
     broadcast({ event: 'printing', filename, copies });
     res.json({ success: true });
