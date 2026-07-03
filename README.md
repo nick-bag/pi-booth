@@ -102,14 +102,21 @@ npm run dev:client   # terminal 2
 
 Client: `http://localhost:5173` — API calls are proxied to the server automatically.
 
-### 4. Production
+### 4. Production (Pi)
+
+Run the setup/startup script — it checks and installs all system dependencies, builds the client, and starts the server with pm2:
 
 ```bash
-# Build the React client
-npm run build
+chmod +x start.sh
+./start.sh
+```
 
-# Start the server (serves client + API on one port)
-npm start
+pm2 will keep the app running and restart it on reboot automatically.
+
+```bash
+pm2 logs pi-booth     # view logs
+pm2 restart pi-booth  # restart
+pm2 stop pi-booth     # stop
 ```
 
 Access everything at `http://<pi-ip>:3001`.
