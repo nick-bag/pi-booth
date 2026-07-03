@@ -6,14 +6,15 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { readdir, readFile, writeFile, unlink } from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import sharp from 'sharp';
 import { createRequire } from 'module';
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import path from 'path';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const require = createRequire(import.meta.url);
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, 'config.json');
 let config = require('./config.json');
 
