@@ -1,0 +1,139 @@
+.liveWrap {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+.liveOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.camLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1.5rem;
+  font-size: 1.4rem;
+  color: rgba(255,255,255,0.7);
+}
+
+.spinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid rgba(255,255,255,0.15);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.shotPreview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 1.5rem;
+  gap: 1rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.shotPreviewImg {
+  flex: 1;
+  min-height: 0;
+  object-fit: contain;
+  width: 100%;
+}
+
+.shotPreviewLabel {
+  font-size: 1.2rem;
+  color: rgba(255,255,255,0.6);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  padding: 1.5rem;
+  gap: 1.5rem;
+}
+
+.previewImg {
+  flex: 1;
+  min-height: 0;
+  object-fit: contain;
+  width: 100%;
+}
+
+.previewActions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 360px;
+  align-items: center;
+}
+
+.doneIcon {
+  font-size: 6rem;
+  color: var(--success);
+  animation: pop 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+.doneText {
+  font-size: 2rem;
+  color: var(--text);
+}
+
+.doneSubtext {
+  color: rgba(255,255,255,0.5);
+}
+
+.errorIcon {
+  font-size: 6rem;
+  color: var(--danger);
+}
+
+.errorText {
+  font-size: 1.2rem;
+  color: var(--danger);
+  text-align: center;
+  max-width: 300px;
+}
+
+.autoReturn {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.35);
+  margin-top: 1rem;
+  letter-spacing: 0.05em;
+}
+
+@keyframes pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1);   opacity: 1; }
+}

@@ -1,0 +1,50 @@
+{
+  "wedding": {
+    "title": "Your Names",
+    "subtitle": "Your Date",
+    "primaryColor": "#c9a96e",
+    "backgroundColor": "#1a1a1a",
+    "textColor": "#ffffff"
+  },
+  "camera": {
+    "captureCommand": "gphoto2",
+    "captureArgs": [
+      "--capture-image-and-download",
+      "--filename"
+    ],
+    "simulateCapture": true
+  },
+  "print": {
+    "enabled": false,
+    "printer": "DNP_DS-RXH1",
+    "singlePrintCopies": 1,
+    "collagePrintCopies": 2
+  },
+  "collage": {
+    "shots": 3,
+    "layout": "2x6-strip",
+    "countdownSeconds": 2,
+    "enabled": true,
+    "shotPreviewSeconds": 1
+  },
+  "single": {
+    "layout": "4x6",
+    "countdownSeconds": 2
+  },
+  "gallery": {
+    "enabled": true
+  },
+  "admin": {
+    "pin": "1234"
+  },
+  "picture": {
+    "enabled": true
+  },
+  "booth": {
+    "autoReturnSeconds": 10
+  },
+  "template": {
+    "enabled": true,
+    "text": "Your Names · Your Date"
+  }
+}

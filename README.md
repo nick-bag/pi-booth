@@ -1,0 +1,140 @@
+# Pi Booth
+
+A DIY photo booth built for events and weddings, running on a Raspberry Pi 4 with a DSLR camera and an iPad as the client interface.
+
+## Stack
+
+- **Server**: Node.js + Express + WebSocket
+- **Client**: React + Vite (served as a PWA on the iPad)
+- **Camera**: gPhoto2 (Nikon D3300 via USB)
+- **Image processing**: Sharp
+- **Printing**: CUPS (DNP DS-RX1H dye-sub printer)
+
+## Features
+
+- **Single photo** mode (4x6)
+- **Photo strip** mode — 3-shot collage (2x6 strip at 300dpi)
+  - Live countdown between each shot
+  - Preview of each shot before the next countdown
+- **Live camera preview** — iPad front camera shown as fullscreen background
+- **Auto-return** to home screen after photo is taken (configurable delay, 0 = disabled)
+- **Auto-print** — when printing is enabled, prints automatically after capture (no button)
+- **Photo template overlay** — composites couple name/date onto photos at print time (non-destructive, original file untouched)
+- **Admin panel** (PIN-protected)
+  - Settings: all config fields editable without restarting the server
+  - Gallery tab: view, download, print (with or without template), and delete photos
+
+## Hardware Setup
+
+| Component | Details |
+|-----------|---------|
+| Pi | Raspberry Pi 4 (2GB) |
+| Camera | Nikon D3300 via USB (gPhoto2) |
+| Client | iPad (PWA, front camera for live preview) |
+| Printer | DNP DS-RX1H (CUPS) |
+
+### Pi Dependencies
+
+```bash
+sudo apt-get install gphoto2 libvips-dev librsvg2-dev cups
+```
+
+> `librsvg2-dev` is required for Sharp to render SVG template overlays.
+
+## Project Structure
+
+```
+pi-booth/
+├── server/
+│   ├── index.js        # Express + WebSocket server, all API routes
+│   ├── config.json     # Single source of truth for all settings
+│   └── package.json
+├── client/
+│   ├── src/
+│   │   ├── App.jsx
+│   │   ├── pages/
+│   │   │   ├── StartPage.jsx
+│   │   │   ├── CapturePage.jsx
+│   │   │   └── AdminPage.jsx
+│   │   └── hooks/
+│   │       ├── usePhotobooth.js
+│   │       └── useCountdown.js
+│   └── package.json
+├── data/
+│   └── photos/         # Captured photos saved here (gitignored)
+└── docs/
+```
+
+## Getting Started
+
+### 1. Install dependencies
+
+```bash
+# Server
+cd server && npm install
+
+# Client
+cd client && npm install
+```
+
+### 2. Configure
+
+Edit `server/config.json`:
+
+```json
+{
+  "camera": {
+    "simulateCapture": true
+  },
+  "print": {
+    "enabled": false,
+    "printer": "YOUR_PRINTER_NAME"
+  }
+}
+```
+
+Set `simulateCapture: false` on the Pi when the Nikon is connected.
+
+### 3. Run
+
+```bash
+# From project root
+npm run dev
+```
+
+This starts the server on port 3001 and the Vite dev server on port 5173.
+
+### 4. Access
+
+- **Client (iPad)**: `http://<pi-ip>:5173`
+- **Admin panel**: tap "Admin" on the start screen, default PIN: `1234`
+
+## Config Reference
+
+| Key | Description |
+|-----|-------------|
+| `camera.simulateCapture` | Use a placeholder image instead of triggering gPhoto2 |
+| `print.enabled` | Auto-print after every capture |
+| `print.printer` | CUPS printer name (`lpstat -p` to list) |
+| `print.singlePrintCopies` | Copies for single photos |
+| `print.collagePrintCopies` | Copies for collage strips |
+| `collage.countdownSeconds` | Countdown duration between strip shots |
+| `collage.shotPreviewSeconds` | How long each shot preview is shown |
+| `single.countdownSeconds` | Countdown duration for single photos |
+| `booth.autoReturnSeconds` | Seconds before auto-returning home (0 = disabled) |
+| `template.enabled` | Apply text overlay at print time |
+| `template.text` | Overlay text (e.g. event name and date) |
+| `template.fontSize` | Font size in px (at 600px width baseline, auto-scales) |
+| `template.fontColor` | Hex color for overlay text |
+| `template.overlayColor` | Background color of the text banner |
+| `admin.pin` | PIN to access the admin panel |
+
+## Photo Files
+
+| Filename pattern | Description |
+|-----------------|-------------|
+| `photo_TIMESTAMP.jpg` | Single photo |
+| `collage_shot_TIMESTAMP.jpg` | Individual shot from a strip session |
+| `collage_TIMESTAMP.jpg` | Assembled photo strip |
+
+Photos are stored in `data/photos/`. The template overlay is never baked into the saved file — it is only applied on-the-fly at print time.

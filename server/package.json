@@ -1,0 +1,20 @@
+{
+  "name": "pi-booth-server",
+  "version": "1.0.0",
+  "description": "Pi Booth backend server",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "sharp": "^0.33.2",
+    "ws": "^8.16.0"
+  },
+  "allowScripts": {
+    "sharp@0.33.5": true
+  }
+}

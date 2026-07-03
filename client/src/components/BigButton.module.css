@@ -1,0 +1,40 @@
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 1.2rem 2.4rem;
+  border-radius: 999px;
+  font-size: 1.5rem;
+  font-family: inherit;
+  letter-spacing: 0.08em;
+  transition: transform 0.12s, opacity 0.12s;
+  min-width: 220px;
+  touch-action: manipulation;
+}
+
+.btn:active {
+  transform: scale(0.95);
+  opacity: 0.85;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.primary {
+  background: var(--primary);
+  color: #1a1a1a;
+  font-weight: bold;
+}
+
+.secondary {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.danger {
+  background: var(--danger);
+  color: #fff;
+}
