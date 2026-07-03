@@ -36,10 +36,23 @@ A DIY photo booth built for events and weddings, running on a Raspberry Pi 4 wit
 ### Pi Dependencies
 
 ```bash
-sudo apt-get install gphoto2 libvips-dev librsvg2-dev cups printer-driver-gutenprint
+sudo apt-get install gphoto2 libvips-dev librsvg2-dev cups printer-driver-gutenprint imagemagick
 ```
 
 > `librsvg2-dev` is required for Sharp to render SVG template overlays.
+> `imagemagick` is required to convert JPEG to PNG before sending to the dye-sub printer (the CUPS `imagetoraster` filter does not support JPEG directly).
+
+### Printer Setup (one-time)
+
+1. Connect the printer via USB, then enable and configure CUPS:
+   ```bash
+   sudo systemctl enable --now cups
+   sudo cupsctl WebInterface=yes --remote-admin --remote-any
+   sudo usermod -a -G lpadmin,lp pi
+   ```
+2. Open `https://<pi-ip>:631` in a browser, go to **Administration > Add Printer**
+3. Select the DNP printer, name it (e.g. `DS-RX1`), and select the gutenprint driver
+4. Run `lpstat -p` to confirm the printer name and update `print.printer` in config
 
 ## Project Structure
 

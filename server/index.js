@@ -107,7 +107,14 @@ async function buildCollageStrip(imagePaths) {
 // Print via CUPS
 async function printFile(filepath, copies = 1) {
   const printer = config.print.printer;
-  await execAsync(`lp -d "${printer}" -n ${copies} "${filepath}"`);
+  // imagetoraster filter can't handle JPEG — convert to PNG first
+  const tmpPng = filepath.replace(/\.(jpg|jpeg)$/i, `_print_tmp_${Date.now()}.png`);
+  await execAsync(`convert "${filepath}" "${tmpPng}"`);
+  try {
+    await execAsync(`lp -d "${printer}" -n ${copies} "${tmpPng}"`);
+  } finally {
+    await unlink(tmpPng).catch(() => {});
+  }
 }
 
 // Composite a text overlay banner onto a copy of the photo (bottom of image).
