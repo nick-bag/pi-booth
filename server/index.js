@@ -43,13 +43,6 @@ app.use(cors());
 app.use(express.json());
 app.use('/photos', express.static(PHOTOS_DIR));
 
-// Serve built client in production
-const CLIENT_DIST = path.join(path.dirname(new URL(import.meta.url).pathname), '../client/dist');
-if (existsSync(CLIENT_DIST)) {
-  app.use(express.static(CLIENT_DIST));
-  app.get('*', (req, res) => res.sendFile(path.join(CLIENT_DIST, 'index.html')));
-}
-
 // WebSocket broadcast helper
 function broadcast(data) {
   wss.clients.forEach((client) => {
@@ -335,5 +328,11 @@ wss.on('connection', (ws) => {
 
 const PORT = 443;
 server.listen(PORT, '0.0.0.0', () => {
+  // Serve built client in production (registered last so API routes take priority)
+  const CLIENT_DIST = path.join(__dirname, '../client/dist');
+  if (existsSync(CLIENT_DIST)) {
+    app.use(express.static(CLIENT_DIST));
+    app.get('*', (req, res) => res.sendFile(path.join(CLIENT_DIST, 'index.html')));
+  }
   console.log(`Pi Booth server running on https://0.0.0.0:${PORT}`);
 });
