@@ -43,6 +43,14 @@ app.use(cors());
 app.use(express.json());
 app.use('/photos', express.static(PHOTOS_DIR));
 
+// Strip /api prefix — Vite proxy does this in dev, we do it here in production
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    req.url = req.url.replace('/api/', '/');
+  }
+  next();
+});
+
 // WebSocket broadcast helper
 function broadcast(data) {
   wss.clients.forEach((client) => {
