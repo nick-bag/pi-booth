@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # --- System dependencies ---
 
-APT_PACKAGES=(gphoto2 libvips-dev librsvg2-dev cups)
+APT_PACKAGES=(gphoto2 libvips-dev librsvg2-dev cups printer-driver-gutenprint)
 MISSING_APT=()
 
 info "Checking system dependencies..."

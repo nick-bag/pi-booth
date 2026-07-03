@@ -36,7 +36,7 @@ A DIY photo booth built for events and weddings, running on a Raspberry Pi 4 wit
 ### Pi Dependencies
 
 ```bash
-sudo apt-get install gphoto2 libvips-dev librsvg2-dev cups
+sudo apt-get install gphoto2 libvips-dev librsvg2-dev cups printer-driver-gutenprint
 ```
 
 > `librsvg2-dev` is required for Sharp to render SVG template overlays.
