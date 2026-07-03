@@ -18,4 +18,5 @@ npm-debug.log*
 
 # Env / secrets
 .env
-.env.*
+.env.local
+.env.*.local
