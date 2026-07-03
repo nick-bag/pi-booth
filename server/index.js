@@ -107,15 +107,34 @@ async function buildCollageStrip(imagePaths) {
 // Print via CUPS
 async function printFile(filepath, copies = 1, type = 'single') {
   const printer = config.print.printer;
-  // imagetoraster filter can't handle JPEG — convert to PNG first
-  const tmpPng = filepath.replace(/\.(jpg|jpeg)$/i, `_print_tmp_${Date.now()}.png`);
-  await execAsync(`convert "${filepath}" "${tmpPng}"`);
-  // Use correct media size: collage strip = 2x6 (w288h432-div2), single = 4x6 (w288h432)
+  let fileToPrint = filepath;
+  let tmpPng = null;
+
+  if (type === 'collage') {
+    // Place two copies of the strip side-by-side on a 4x6 canvas (1200x1800 at 300dpi)
+    // Printer cuts at midpoint via w288h432-div2, producing two full 2x6 strips
+    tmpPng = filepath.replace(/\.(jpg|jpeg)$/i, `_print_tmp_${Date.now()}.png`);
+    const strip = await sharp(filepath).resize(600, 1800, { fit: 'fill' }).toBuffer();
+    await sharp({ create: { width: 1200, height: 1800, channels: 3, background: '#000000' } })
+      .composite([
+        { input: strip, left: 0, top: 0 },
+        { input: strip, left: 600, top: 0 },
+      ])
+      .png()
+      .toFile(tmpPng);
+    fileToPrint = tmpPng;
+  } else {
+    // Single photo — convert JPEG to PNG (imagetoraster filter doesn't support JPEG)
+    tmpPng = filepath.replace(/\.(jpg|jpeg)$/i, `_print_tmp_${Date.now()}.png`);
+    await execAsync(`convert "${filepath}" "${tmpPng}"`);
+    fileToPrint = tmpPng;
+  }
+
   const mediaSize = type === 'collage' ? 'w288h432-div2' : 'w288h432';
   try {
-    await execAsync(`lp -d "${printer}" -n ${copies} -o PageSize=${mediaSize} "${tmpPng}"`);
+    await execAsync(`lp -d "${printer}" -n ${copies} -o PageSize=${mediaSize} "${fileToPrint}"`);
   } finally {
-    await unlink(tmpPng).catch(() => {});
+    if (tmpPng) await unlink(tmpPng).catch(() => {});
   }
 }
 
