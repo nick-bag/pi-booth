@@ -65,6 +65,14 @@ cd "$SCRIPT_DIR/client" && npm install
 info "Building client..."
 cd "$SCRIPT_DIR/client" && npm run build
 
+# --- Allow Node to bind to port 80 without root ---
+
+NODE_BIN="$(command -v node)"
+if ! getcap "$NODE_BIN" 2>/dev/null | grep -q cap_net_bind_service; then
+  warn "Granting Node.js permission to bind to port 80..."
+  sudo setcap cap_net_bind_service=+ep "$NODE_BIN"
+fi
+
 # --- Start with pm2 ---
 
 cd "$SCRIPT_DIR"
@@ -84,7 +92,7 @@ pm2 startup systemd -u "$USER" --hp "$HOME" | tail -1 | bash 2>/dev/null || \
 
 info ""
 info "Pi Booth is running!"
-info "Open http://$(hostname -I | awk '{print $1}'):${PORT:-3001} on your iPad."
+info "Open http://$(hostname -I | awk '{print $1}') on your iPad."
 info ""
 info "Useful commands:"
 info "  pm2 logs pi-booth     — view logs"

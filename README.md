@@ -119,13 +119,7 @@ pm2 restart pi-booth  # restart
 pm2 stop pi-booth     # stop
 ```
 
-Access everything at `http://<pi-ip>:3001`.
-
-To use a different port, edit `server/.env`:
-
-```
-PORT=8080
-```
+Access everything at `http://<pi-ip>` (no port number needed).
 
 ### 5. Access
 
@@ -151,7 +145,6 @@ PORT=8080
 | `template.fontColor` | Hex color for overlay text |
 | `template.overlayColor` | Background color of the text banner |
 | `admin.pin` | PIN to access the admin panel |
-| `PORT` (env var) | Server port, default `3001` |
 
 ## Photo Files
 

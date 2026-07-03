@@ -8,11 +8,10 @@ import { readdir, readFile, writeFile, unlink } from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
 import sharp from 'sharp';
 import { createRequire } from 'module';
-import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, '.env') });
 
 const require = createRequire(import.meta.url);
 const CONFIG_PATH = path.join(__dirname, 'config.json');
@@ -313,7 +312,7 @@ wss.on('connection', (ws) => {
   ws.send(JSON.stringify({ event: 'connected' }));
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = 80;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Pi Booth server running on port ${PORT}`);
 });
