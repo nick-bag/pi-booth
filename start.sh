@@ -78,7 +78,7 @@ if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
   openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
     -keyout "$KEY" -out "$CERT" \
     -subj "/CN=pi-booth" \
-    -addext "subjectAltName=IP:${PI_IP},IP:127.0.0.1"
+    -addext "subjectAltName=IP:${PI_IP},IP:127.0.0.1,DNS:booth.local,DNS:localhost"
   info "Certificate generated (valid 10 years)."
   info ""
   warn "ACTION REQUIRED: Trust the certificate on your iPad."
