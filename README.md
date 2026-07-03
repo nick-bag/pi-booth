@@ -123,8 +123,13 @@ Access everything at `http://<pi-ip>` (no port number needed).
 
 ### 5. Access
 
-- **Client (iPad)**: `http://<pi-ip>:<port>`
+- **Client (iPad)**: `https://<pi-ip>` — on first visit Safari will warn about the certificate; follow the trust steps below
 - **Admin panel**: tap "Admin" on the start screen, default PIN: `1234`
+
+> **Trusting the certificate on iPad (one-time setup)**
+> 1. Open `https://<pi-ip>` in Safari and tap "Show Details" → "visit this website"
+> 2. Go to **Settings > General > About > Certificate Trust Settings**
+> 3. Enable full trust for **pi-booth**
 
 ## Config Reference
 

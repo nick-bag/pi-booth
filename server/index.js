@@ -1,17 +1,30 @@
 import express from 'express';
 import cors from 'cors';
 import { WebSocketServer } from 'ws';
-import { createServer } from 'http';
+import { createServer } from 'https';
+import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { readdir, readFile, writeFile, unlink } from 'fs/promises';
-import { existsSync, mkdirSync } from 'fs';
 import sharp from 'sharp';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const CERT_PATH = path.join(__dirname, 'ssl/cert.pem');
+const KEY_PATH  = path.join(__dirname, 'ssl/key.pem');
+
+if (!existsSync(CERT_PATH) || !existsSync(KEY_PATH)) {
+  console.error('SSL certificate not found. Run ./start.sh to generate it.');
+  process.exit(1);
+}
+
+const httpsOptions = {
+  key:  readFileSync(KEY_PATH),
+  cert: readFileSync(CERT_PATH),
+};
 
 const require = createRequire(import.meta.url);
 const CONFIG_PATH = path.join(__dirname, 'config.json');
@@ -23,7 +36,7 @@ const PHOTOS_DIR = path.join(__dirname, '../data/photos');
 if (!existsSync(PHOTOS_DIR)) mkdirSync(PHOTOS_DIR, { recursive: true });
 
 const app = express();
-const server = createServer(app);
+const server = createServer(httpsOptions, app);
 const wss = new WebSocketServer({ server });
 
 app.use(cors());
@@ -312,7 +325,7 @@ wss.on('connection', (ws) => {
   ws.send(JSON.stringify({ event: 'connected' }));
 });
 
-const PORT = 80;
+const PORT = 443;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Pi Booth server running on port ${PORT}`);
+  console.log(`Pi Booth server running on https://0.0.0.0:${PORT}`);
 });

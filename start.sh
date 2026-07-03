@@ -65,11 +65,37 @@ cd "$SCRIPT_DIR/client" && npm install
 info "Building client..."
 cd "$SCRIPT_DIR/client" && npm run build
 
-# --- Allow Node to bind to port 80 without root ---
+# --- SSL certificate ---
+
+SSL_DIR="$SCRIPT_DIR/server/ssl"
+CERT="$SSL_DIR/cert.pem"
+KEY="$SSL_DIR/key.pem"
+
+mkdir -p "$SSL_DIR"
+if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
+  info "Generating self-signed SSL certificate..."
+  PI_IP=$(hostname -I | awk '{print $1}')
+  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+    -keyout "$KEY" -out "$CERT" \
+    -subj "/CN=pi-booth" \
+    -addext "subjectAltName=IP:${PI_IP},IP:127.0.0.1"
+  info "Certificate generated (valid 10 years)."
+  info ""
+  warn "ACTION REQUIRED: Trust the certificate on your iPad."
+  warn "  1. Open https://${PI_IP} in Safari"
+  warn "  2. Tap 'Show Details' then 'visit this website'"
+  warn "  3. Go to Settings > General > About > Certificate Trust Settings"
+  warn "  4. Enable full trust for 'pi-booth'"
+  info ""
+else
+  info "SSL certificate found."
+fi
+
+# --- Allow Node to bind to port 443 without root ---
 
 NODE_BIN="$(command -v node)"
 if ! getcap "$NODE_BIN" 2>/dev/null | grep -q cap_net_bind_service; then
-  warn "Granting Node.js permission to bind to port 80..."
+  warn "Granting Node.js permission to bind to port 443..."
   sudo setcap cap_net_bind_service=+ep "$NODE_BIN"
 fi
 
@@ -92,7 +118,7 @@ pm2 startup systemd -u "$USER" --hp "$HOME" | tail -1 | bash 2>/dev/null || \
 
 info ""
 info "Pi Booth is running!"
-info "Open http://$(hostname -I | awk '{print $1}') on your iPad."
+info "Open https://$(hostname -I | awk '{print $1}') on your iPad."
 info ""
 info "Useful commands:"
 info "  pm2 logs pi-booth     — view logs"
