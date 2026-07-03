@@ -70,16 +70,13 @@ pi-booth/
 ### 1. Install dependencies
 
 ```bash
-# Server
 cd server && npm install
-
-# Client
-cd client && npm install
+cd ../client && npm install
 ```
 
 ### 2. Configure
 
-Edit `server/config.json`:
+Edit `server/config.json` with your event details. At minimum set:
 
 ```json
 {
@@ -93,20 +90,39 @@ Edit `server/config.json`:
 }
 ```
 
-Set `simulateCapture: false` on the Pi when the Nikon is connected.
+Set `simulateCapture: false` on the Pi when the camera is connected.
 
-### 3. Run
+### 3. Development
 
 ```bash
-# From project root
-npm run dev
+# From project root — runs server (port 3001) and Vite dev server (port 5173) separately
+npm run dev:server   # terminal 1
+npm run dev:client   # terminal 2
 ```
 
-This starts the server on port 3001 and the Vite dev server on port 5173.
+Client: `http://localhost:5173` — API calls are proxied to the server automatically.
 
-### 4. Access
+### 4. Production
 
-- **Client (iPad)**: `http://<pi-ip>:5173`
+```bash
+# Build the React client
+npm run build
+
+# Start the server (serves client + API on one port)
+npm start
+```
+
+Access everything at `http://<pi-ip>:3001`.
+
+To use a different port, edit `server/.env`:
+
+```
+PORT=8080
+```
+
+### 5. Access
+
+- **Client (iPad)**: `http://<pi-ip>:<port>`
 - **Admin panel**: tap "Admin" on the start screen, default PIN: `1234`
 
 ## Config Reference
@@ -128,6 +144,7 @@ This starts the server on port 3001 and the Vite dev server on port 5173.
 | `template.fontColor` | Hex color for overlay text |
 | `template.overlayColor` | Background color of the text banner |
 | `admin.pin` | PIN to access the admin panel |
+| `PORT` (env var) | Server port, default `3001` |
 
 ## Photo Files
 

@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
 import { createRequire } from 'module';
+import 'dotenv/config';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -28,6 +29,13 @@ const wss = new WebSocketServer({ server });
 app.use(cors());
 app.use(express.json());
 app.use('/photos', express.static(PHOTOS_DIR));
+
+// Serve built client in production
+const CLIENT_DIST = path.join(path.dirname(new URL(import.meta.url).pathname), '../client/dist');
+if (existsSync(CLIENT_DIST)) {
+  app.use(express.static(CLIENT_DIST));
+  app.get('*', (req, res) => res.sendFile(path.join(CLIENT_DIST, 'index.html')));
+}
 
 // WebSocket broadcast helper
 function broadcast(data) {
