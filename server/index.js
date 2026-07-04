@@ -107,6 +107,16 @@ async function buildCollageStrip(imagePaths) {
 }
 
 // Print via CUPS
+// Measured via a calibration ruler print: the div2 middle cut loses ~0px (clean cut), but the
+// printer's own full-bleed trim eats a fixed number of pixels off the OUTER edges of the whole
+// 4x6 sheet: ~25px off the left, ~20px off the right, ~5px off the top, ~40px off the bottom.
+// These apply to any full 4x6 sheet, so both single photos and collages need to compensate by
+// shrinking/shifting content inward on the trimmed sides, leaving un-trimmed (cut-line) edges as-is.
+const TRIM_LEFT = 25;
+const TRIM_RIGHT = 20;
+const TRIM_TOP = 5;
+const TRIM_BOTTOM = 40;
+
 async function printFile(filepath, copies = 1, type = 'single') {
   const printer = config.print.printer;
   let fileToPrint = filepath;
@@ -115,34 +125,64 @@ async function printFile(filepath, copies = 1, type = 'single') {
   if (type === 'collage') {
     // Place two copies of the strip side-by-side on a 4x6 canvas (1200x1800 at 300dpi).
     // Printer cuts at midpoint via w288h432-div2, producing two full 2x6 strips.
-    // Cut-line bleed is compensated by the driver's StpNoCutWaste option (see lp command
-    // below) rather than by guessing pixel offsets in software.
     tmpPng = filepath.replace(/\.(jpg|jpeg)$/i, `_print_tmp_${Date.now()}.png`);
     const backgroundColor = config.print?.backgroundColor ?? '#1a1a1a';
-    const strip = await sharp(filepath).toBuffer();
+    const border = config.print?.borderSize ?? 20;
+
+    const stripMeta = await sharp(filepath).metadata();
+    const stripW = stripMeta.width; // 600
+    const stripH = stripMeta.height; // 1800
+
+    // Pull out just the inner content (photos + internal gaps), excluding the strip's own
+    // baked-in outer border, so we can reposition/resize it independently per side.
+    const contentBuf = await sharp(filepath)
+      .extract({ left: border, top: border, width: stripW - 2 * border, height: stripH - 2 * border })
+      .toBuffer();
+
+    const contentH = stripH - TRIM_TOP - TRIM_BOTTOM - 2 * border;
+
+    // Left copy: outer border compensated on the left, top and bottom; cut-side (right) border
+    // stays as-is since the cut loses nothing.
+    const leftContentW = stripW - TRIM_LEFT - 2 * border;
+    const leftContent = await sharp(contentBuf).resize(leftContentW, contentH).toBuffer();
+    const leftCopy = await sharp({ create: { width: stripW, height: stripH, channels: 3, background: backgroundColor } })
+      .composite([{ input: leftContent, left: TRIM_LEFT + border, top: TRIM_TOP + border }])
+      .png()
+      .toBuffer();
+
+    // Right copy: outer border compensated on the right, top and bottom; cut-side (left)
+    // border stays as-is.
+    const rightContentW = stripW - TRIM_RIGHT - 2 * border;
+    const rightContent = await sharp(contentBuf).resize(rightContentW, contentH).toBuffer();
+    const rightCopy = await sharp({ create: { width: stripW, height: stripH, channels: 3, background: backgroundColor } })
+      .composite([{ input: rightContent, left: border, top: TRIM_TOP + border }])
+      .png()
+      .toBuffer();
+
     await sharp({ create: { width: 1200, height: 1800, channels: 3, background: backgroundColor } })
       .composite([
-        { input: strip, left: 0, top: 0 },
-        { input: strip, left: 600, top: 0 },
+        { input: leftCopy, left: 0, top: 0 },
+        { input: rightCopy, left: 600, top: 0 },
       ])
       .png()
       .toFile(tmpPng);
     fileToPrint = tmpPng;
   } else {
-    // Single photo — add border and convert to PNG (imagetoraster filter doesn't support JPEG)
+    // Single photo — no cut line, so all four edges are "outer" edges and all get trim
+    // compensation. Render onto a fixed 1200x1800 (4x6 @ 300dpi) canvas so the same
+    // measured pixel trims apply regardless of the source photo's native resolution.
     tmpPng = filepath.replace(/\.(jpg|jpeg)$/i, `_print_tmp_${Date.now()}.png`);
     const border = config.print?.borderSize ?? 0;
     const backgroundColor = config.print?.backgroundColor ?? '#1a1a1a';
-    if (border > 0) {
-      const { width } = await sharp(filepath).metadata();
-      const scaledBorder = Math.round(border * (width / 600));
-      await sharp(filepath)
-        .extend({ top: scaledBorder, bottom: scaledBorder, left: scaledBorder, right: scaledBorder, background: backgroundColor })
-        .png()
-        .toFile(tmpPng);
-    } else {
-      await execAsync(`convert "${filepath}" "${tmpPng}"`);
-    }
+
+    const contentW = 1200 - TRIM_LEFT - TRIM_RIGHT - 2 * border;
+    const contentH = 1800 - TRIM_TOP - TRIM_BOTTOM - 2 * border;
+    const content = await sharp(filepath).resize(contentW, contentH, { fit: 'cover' }).toBuffer();
+
+    await sharp({ create: { width: 1200, height: 1800, channels: 3, background: backgroundColor } })
+      .composite([{ input: content, left: TRIM_LEFT + border, top: TRIM_TOP + border }])
+      .png()
+      .toFile(tmpPng);
     fileToPrint = tmpPng;
   }
 
