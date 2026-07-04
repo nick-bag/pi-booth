@@ -167,6 +167,15 @@ async function printFile(filepath, copies = 1, type = 'single') {
   }
 }
 
+function escapeXml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 // Composite a text overlay banner onto a copy of the photo (bottom of image).
 // Leaves the original file untouched; saves a _print version alongside it.
 // Returns the print copy path, or null if template is disabled.
@@ -174,8 +183,7 @@ async function applyTemplate(filepath) {
   if (!config.template?.enabled || !config.template?.text) return null;
 
   const { width, height } = await sharp(filepath).metadata();
-  const text = config.template.text;
-  // Scale font size relative to collage strip width (600px baseline)
+  const text = escapeXml(config.template.text);
   const fontSize = Math.round((config.template.fontSize || 48) * (width / 600));
   const fontColor = config.template.fontColor || '#ffffff';
   const overlayColor = config.template.overlayColor || 'rgba(0,0,0,0.5)';
@@ -290,8 +298,7 @@ app.post('/print', async (req, res) => {
       const ext = path.extname(filepath);
       tempPath = filepath.replace(new RegExp(`${ext}$`), `_tmp_print_${Date.now()}${ext}`);
       const { width, height } = await sharp(filepath).metadata();
-      const text = config.template.text;
-      const fontSize = Math.round((config.template.fontSize || 48) * (width / 600));
+      const text = escapeXml(config.template.text);
       const fontColor = config.template.fontColor || '#ffffff';
       const overlayColor = config.template.overlayColor || 'rgba(0,0,0,0.5)';
       const bannerH = Math.round(fontSize * 2.4);
