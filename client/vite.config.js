@@ -23,6 +23,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        navigateFallbackDenylist: [/^\/cert/],
       },
     }),
   ],
@@ -34,6 +35,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
       '/photos': 'http://localhost:3001',
+      '/cert': 'http://localhost:3001',
       '/ws': {
         target: 'ws://localhost:3001',
         ws: true,
