@@ -113,30 +113,17 @@ async function printFile(filepath, copies = 1, type = 'single') {
   let tmpPng = null;
 
   if (type === 'collage') {
-    // Place two copies of the strip side-by-side on a 4x6 canvas (1200x1800 at 300dpi)
+    // Place two copies of the strip side-by-side on a 4x6 canvas (1200x1800 at 300dpi).
     // Printer cuts at midpoint via w288h432-div2, producing two full 2x6 strips.
-    // Each strip is resized to (600 - borderSize) wide, then explicitly extended with
-    // borderSize pixels of background color on the cut-facing edge, so after cutting
-    // each 2x6 strip has a visible border on all four sides.
+    // buildCollageStrip already bakes equal borders on all four sides of the strip,
+    // so placing both copies at x:0 and x:600 gives equal borders after cutting.
     tmpPng = filepath.replace(/\.(jpg|jpeg)$/i, `_print_tmp_${Date.now()}.png`);
-    const border = config.print?.borderSize ?? 20;
     const backgroundColor = config.print?.backgroundColor ?? '#1a1a1a';
-    const innerW = 600 - border;
-
-    const leftStrip = await sharp(filepath)
-      .resize(innerW, 1800, { fit: 'fill' })
-      .extend({ right: border, background: backgroundColor })
-      .toBuffer();
-
-    const rightStrip = await sharp(filepath)
-      .resize(innerW, 1800, { fit: 'fill' })
-      .extend({ left: border, background: backgroundColor })
-      .toBuffer();
-
+    const strip = await sharp(filepath).toBuffer();
     await sharp({ create: { width: 1200, height: 1800, channels: 3, background: backgroundColor } })
       .composite([
-        { input: leftStrip, left: 0, top: 0 },
-        { input: rightStrip, left: 600, top: 0 },
+        { input: strip, left: 0, top: 0 },
+        { input: strip, left: 600, top: 0 },
       ])
       .png()
       .toFile(tmpPng);
