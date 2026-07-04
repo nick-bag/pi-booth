@@ -253,6 +253,8 @@ export default function AdminPage({ onExit }) {
                 onChange={(v) => set('collage.countdownSeconds', v)} min={1} max={10} />
               <NumberField label="Strip Shot Preview (sec)" value={config.collage.shotPreviewSeconds}
                 onChange={(v) => set('collage.shotPreviewSeconds', v)} min={1} max={10} />
+              <NumberField label="Photos Per Strip" value={config.collage.shots ?? 3}
+                onChange={(v) => set('collage.shots', v)} min={2} max={6} />
             </section>
 
             {/* Template */}
