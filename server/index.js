@@ -172,7 +172,7 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
     // Left copy: outer border compensated on the left, top and bottom; cut-side (right) border
     // stays as-is since the cut loses nothing.
     const leftContentW = stripW - TRIM_LEFT - 2 * border;
-    const leftContent = await sharp(contentBuf).resize(leftContentW, contentH).toBuffer();
+    const leftContent = await sharp(contentBuf).resize(leftContentW, contentH, { fit: 'fill' }).toBuffer();
     const leftComposites = [{ input: leftContent, left: TRIM_LEFT + border, top: TRIM_TOP + border }];
     if (bannerSvg) leftComposites.push({ input: bannerSvg, left: 0, top: bannerTop });
     const leftCopy = await sharp({ create: { width: stripW, height: stripH, channels: 3, background: backgroundColor } })
@@ -183,7 +183,7 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
     // Right copy: outer border compensated on the right, top and bottom; cut-side (left)
     // border stays as-is.
     const rightContentW = stripW - TRIM_RIGHT - 2 * border;
-    const rightContent = await sharp(contentBuf).resize(rightContentW, contentH).toBuffer();
+    const rightContent = await sharp(contentBuf).resize(rightContentW, contentH, { fit: 'fill' }).toBuffer();
     const rightComposites = [{ input: rightContent, left: border, top: TRIM_TOP + border }];
     if (bannerSvg) rightComposites.push({ input: bannerSvg, left: 0, top: bannerTop });
     const rightCopy = await sharp({ create: { width: stripW, height: stripH, channels: 3, background: backgroundColor } })
