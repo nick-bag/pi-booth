@@ -141,13 +141,19 @@ async function printFile(filepath, copies = 1, type = 'single') {
     const backgroundColor = config.print?.backgroundColor ?? '#1a1a1a';
     const border = config.print?.borderSize ?? 20;
 
+    // Must match buildCollageStrip()'s STRIP_W/STRIP_H exactly. Normalize (defensive) in case
+    // a mismatched file is ever passed in, so the extract/composite math below can't crash.
+    const stripW = 600;
+    const stripH = 1800;
     const stripMeta = await sharp(filepath).metadata();
-    const stripW = stripMeta.width; // 600
-    const stripH = stripMeta.height; // 1800
+    const stripBuf = stripMeta.width === stripW && stripMeta.height === stripH
+      ? await sharp(filepath).toBuffer()
+      : (console.warn(`Collage strip was ${stripMeta.width}x${stripMeta.height}, expected ${stripW}x${stripH} — resizing to fit.`),
+        await sharp(filepath).resize(stripW, stripH, { fit: 'fill' }).toBuffer());
 
     // Pull out just the inner content (photos + internal gaps), excluding the strip's own
     // baked-in outer border, so we can reposition/resize it independently per side.
-    const contentBuf = await sharp(filepath)
+    const contentBuf = await sharp(stripBuf)
       .extract({ left: border, top: border, width: stripW - 2 * border, height: stripH - 2 * border })
       .toBuffer();
 
