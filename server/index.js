@@ -129,10 +129,12 @@ async function toPortrait(filepath) {
   return { pipeline, width, height };
 }
 
-async function printFile(filepath, copies = 1, type = 'single') {
+async function printFile(filepath, copies = 1, type = 'single', withTemplate = false) {
   const printer = config.print.printer;
   let fileToPrint = filepath;
   let tmpPng = null;
+
+  const templateActive = withTemplate && config.template?.enabled && config.template?.text;
 
   if (type === 'collage') {
     // Place two copies of the strip side-by-side on a 4x6 canvas (1200x1800 at 300dpi).
@@ -157,14 +159,24 @@ async function printFile(filepath, copies = 1, type = 'single') {
       .extract({ left: border, top: border, width: stripW - 2 * border, height: stripH - 2 * border })
       .toBuffer();
 
-    const contentH = stripH - TRIM_TOP - TRIM_BOTTOM - 2 * border;
+    // The 4x6 sheet has a fixed physical height — the name banner (if any) shares that space
+    // with the photos rather than extending past it. It sits directly below the photo content,
+    // above the bottom border, and is identical on both resulting 2x6 strips.
+    const bannerH = templateActive ? Math.round((config.template.bannerHeight ?? 100) * (stripW / 600)) : 0;
+    const availableV = stripH - TRIM_TOP - TRIM_BOTTOM;
+    const contentH = availableV - 2 * border - bannerH;
+    const bannerTop = TRIM_TOP + border + contentH;
+
+    const bannerSvg = bannerH > 0 ? buildBannerSvg(stripW, bannerH) : null;
 
     // Left copy: outer border compensated on the left, top and bottom; cut-side (right) border
     // stays as-is since the cut loses nothing.
     const leftContentW = stripW - TRIM_LEFT - 2 * border;
     const leftContent = await sharp(contentBuf).resize(leftContentW, contentH).toBuffer();
+    const leftComposites = [{ input: leftContent, left: TRIM_LEFT + border, top: TRIM_TOP + border }];
+    if (bannerSvg) leftComposites.push({ input: bannerSvg, left: 0, top: bannerTop });
     const leftCopy = await sharp({ create: { width: stripW, height: stripH, channels: 3, background: backgroundColor } })
-      .composite([{ input: leftContent, left: TRIM_LEFT + border, top: TRIM_TOP + border }])
+      .composite(leftComposites)
       .png()
       .toBuffer();
 
@@ -172,8 +184,10 @@ async function printFile(filepath, copies = 1, type = 'single') {
     // border stays as-is.
     const rightContentW = stripW - TRIM_RIGHT - 2 * border;
     const rightContent = await sharp(contentBuf).resize(rightContentW, contentH).toBuffer();
+    const rightComposites = [{ input: rightContent, left: border, top: TRIM_TOP + border }];
+    if (bannerSvg) rightComposites.push({ input: bannerSvg, left: 0, top: bannerTop });
     const rightCopy = await sharp({ create: { width: stripW, height: stripH, channels: 3, background: backgroundColor } })
-      .composite([{ input: rightContent, left: border, top: TRIM_TOP + border }])
+      .composite(rightComposites)
       .png()
       .toBuffer();
 
@@ -193,13 +207,21 @@ async function printFile(filepath, copies = 1, type = 'single') {
     const border = config.print?.borderSize ?? 0;
     const backgroundColor = config.print?.backgroundColor ?? '#1a1a1a';
 
+    // Name banner (if any) shares the fixed 1800px height budget with the photo, sitting
+    // directly below it and above the bottom border.
+    const bannerH = templateActive ? Math.round((config.template.bannerHeight ?? 100) * (1200 / 600)) : 0;
     const contentW = 1200 - TRIM_LEFT - TRIM_RIGHT - 2 * border;
-    const contentH = 1800 - TRIM_TOP - TRIM_BOTTOM - 2 * border;
+    const contentH = 1800 - TRIM_TOP - TRIM_BOTTOM - 2 * border - bannerH;
+    const bannerTop = TRIM_TOP + border + contentH;
+
     const { pipeline } = await toPortrait(filepath);
     const content = await pipeline.resize(contentW, contentH, { fit: 'cover' }).toBuffer();
 
+    const composites = [{ input: content, left: TRIM_LEFT + border, top: TRIM_TOP + border }];
+    if (bannerH > 0) composites.push({ input: buildBannerSvg(1200, bannerH), left: 0, top: bannerTop });
+
     await sharp({ create: { width: 1200, height: 1800, channels: 3, background: backgroundColor } })
-      .composite([{ input: content, left: TRIM_LEFT + border, top: TRIM_TOP + border }])
+      .composite(composites)
       .png()
       .toFile(tmpPng);
     fileToPrint = tmpPng;
@@ -223,41 +245,22 @@ function escapeXml(str) {
     .replace(/'/g, '&apos;');
 }
 
-// Add a name/text banner in a new blank strip BELOW the photo (the photo itself stays
-// fully uncovered). Leaves the original file untouched; saves a _print version alongside it.
-// Returns the print copy path, or null if template is disabled.
-async function applyTemplate(filepath) {
-  if (!config.template?.enabled || !config.template?.text) return null;
-
-  const { pipeline, width, height } = await toPortrait(filepath);
+// Build the name/date banner as an SVG buffer (background rect + centered text) sized to
+// exactly fill its reserved space, so it can be composited directly without growing any canvas.
+function buildBannerSvg(width, bannerH) {
   const text = escapeXml(config.template.text);
   const fontSize = Math.round((config.template.fontSize || 48) * (width / 600));
   const fontColor = config.template.fontColor || '#ffffff';
   const overlayColor = config.template.overlayColor || 'rgba(0,0,0,0.5)';
-  // Height of the new blank strip added below the photo, scaled from a 600px-wide
-  // reference (like fontSize) so it stays proportional at any source resolution.
-  // Adjustable in the admin panel (template.bannerHeight).
-  const bannerH = Math.round((config.template.bannerHeight ?? 100) * (width / 600));
-  const newHeight = height + bannerH;
-  const textY = height + Math.round(bannerH / 2);
+  const textY = Math.round(bannerH / 2);
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${newHeight}">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${bannerH}">
+    <rect x="0" y="0" width="${width}" height="${bannerH}" fill="${overlayColor}"/>
     <text x="${Math.round(width / 2)}" y="${textY}"
       text-anchor="middle" dominant-baseline="middle"
       font-size="${fontSize}" fill="${fontColor}" font-family="Georgia, serif">${text}</text>
   </svg>`;
-
-  // Save as a separate _print copy; original stays clean
-  const ext = path.extname(filepath);
-  const printPath = filepath.replace(new RegExp(`${ext}$`), `_print${ext}`);
-
-  await pipeline
-    .extend({ bottom: bannerH, background: overlayColor })
-    .composite([{ input: Buffer.from(svg), blend: 'over' }])
-    .jpeg({ quality: 95 })
-    .toFile(printPath);
-
-  return printPath;
+  return Buffer.from(svg);
 }
 
 // --- Routes ---
@@ -341,17 +344,8 @@ app.post('/print', async (req, res) => {
     const filepath = path.join(PHOTOS_DIR, filename);
     if (!existsSync(filepath)) return res.status(404).json({ success: false, error: 'File not found' });
 
-      // Optionally composite template on-the-fly to a temp file, then print it
-    let fileToPrint = filepath;
-    let tempPath = null;
-    if (withTemplate) {
-      tempPath = await applyTemplate(filepath);
-      if (tempPath) fileToPrint = tempPath;
-    }
-
     const copies = type === 'collage' ? config.print.collagePrintCopies : config.print.singlePrintCopies;
-    await printFile(fileToPrint, copies, type);
-    if (tempPath) await unlink(tempPath);
+    await printFile(filepath, copies, type, withTemplate);
     broadcast({ event: 'printing', filename, copies });
     res.json({ success: true });
   } catch (err) {
