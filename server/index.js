@@ -358,12 +358,28 @@ app.post('/admin/print-calibration', async (req, res) => {
     // Vertical reference line at the intended cut midpoint
     ticks += `<line x1="${W / 2}" y1="0" x2="${W / 2}" y2="${H}" stroke="red" stroke-width="4"/>`;
 
+    // Vertical rulers (measure top/bottom trim) - one placed inside each half so neither
+    // gets lost to the middle cut. Absolute Y pixel positions (0-1800), labeled every 50px.
+    let vticks = '';
+    const vRulerXs = [100, 1100];
+    for (const rx of vRulerXs) {
+      for (let y = 0; y <= H; y += 10) {
+        const isMajor = y % 50 === 0;
+        const tickLen = isMajor ? 60 : 25;
+        vticks += `<line x1="${rx}" y1="${y}" x2="${rx + tickLen}" y2="${y}" stroke="black" stroke-width="${isMajor ? 3 : 1}"/>`;
+        if (isMajor) {
+          vticks += `<text x="${rx + tickLen + 8}" y="${y + 7}" text-anchor="start" font-size="20" fill="black">${y}</text>`;
+        }
+      }
+    }
+
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
       <rect x="0" y="0" width="${W / 2}" height="${H}" fill="#cfe8ff"/>
       <rect x="${W / 2}" y="0" width="${W / 2}" height="${H}" fill="#ffd6e8"/>
       <text x="${W / 4}" y="${H / 2}" text-anchor="middle" font-size="60" fill="black">LEFT</text>
       <text x="${(3 * W) / 4}" y="${H / 2}" text-anchor="middle" font-size="60" fill="black">RIGHT</text>
       ${ticks}
+      ${vticks}
     </svg>`;
 
     const calibPath = path.join(PHOTOS_DIR, `_calibration_${Date.now()}.png`);
