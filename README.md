@@ -140,7 +140,7 @@ Access everything at `http://<pi-ip>` (no port number needed).
 - **Admin panel**: tap "Admin" on the start screen, default PIN: `1234`
 
 > **Trusting the certificate on iPad (one-time setup)**
-> 1. On the iPad, open Safari and go to `http://booth.local/cert` (plain HTTP — no trust needed) — tap Allow to download
+> 1. On the iPad, open Safari and go to `https://booth.local/cert` — tap Allow to download
 > 2. Go to **Settings > General > VPN & Device Management** and tap the **pi-booth** profile, then tap **Install**
 > 3. Go to **Settings > General > About > Certificate Trust Settings** and enable full trust for **pi-booth**
 

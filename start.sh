@@ -82,8 +82,8 @@ if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
   info "Certificate generated (valid 10 years)."
   info ""
   warn "ACTION REQUIRED: Trust the certificate on your iPad."
-  warn "  1. Open http://${PI_IP}/cert in Safari (plain HTTP) to download the cert"
-  warn "  2. Go to Settings > General > VPN & Device Management and install the profile"
+  warn "  1. Open https://${PI_IP} in Safari"
+  warn "  2. Tap 'Show Details' then 'visit this website'"
   warn "  3. Go to Settings > General > About > Certificate Trust Settings"
   warn "  4. Enable full trust for 'pi-booth'"
   info ""
@@ -95,7 +95,7 @@ fi
 
 NODE_BIN="$(command -v node)"
 if ! getcap "$NODE_BIN" 2>/dev/null | grep -q cap_net_bind_service; then
-  warn "Granting Node.js permission to bind to ports 80 and 443..."
+  warn "Granting Node.js permission to bind to port 443..."
   sudo setcap cap_net_bind_service=+ep "$NODE_BIN"
 fi
 
