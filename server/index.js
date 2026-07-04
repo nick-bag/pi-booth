@@ -75,19 +75,19 @@ async function capturePhoto(filename) {
   return filepath;
 }
 
-// Build a 2x6 collage strip from 3 images
+// Build a 2x6 collage strip from N images
 async function buildCollageStrip(imagePaths) {
   // 2x6 at 300dpi = 600x1800px
   const STRIP_W = 600;
   const STRIP_H = 1800;
-  const THUMB_W = 600;
-  const THUMB_H = 580;
   const GAP = 20;
+  const n = imagePaths.length;
+  const THUMB_H = Math.floor((STRIP_H - GAP * (n - 1)) / n);
 
   const composites = await Promise.all(
     imagePaths.map(async (imgPath, i) => {
       const resized = await sharp(imgPath)
-        .resize(THUMB_W, THUMB_H, { fit: 'cover' })
+        .resize(STRIP_W, THUMB_H, { fit: 'cover' })
         .toBuffer();
       return { input: resized, top: i * (THUMB_H + GAP), left: 0 };
     })
