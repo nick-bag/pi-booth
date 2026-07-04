@@ -117,6 +117,18 @@ const TRIM_RIGHT = 20;
 const TRIM_TOP = 5;
 const TRIM_BOTTOM = 40;
 
+// Rotate landscape captures (e.g. the simulated camera's 1800x1200 placeholder) to portrait
+// so downstream border/trim math — measured against a portrait 4x6 page — applies correctly.
+// Returns a sharp pipeline plus the resulting (already-portrait) width/height.
+async function toPortrait(filepath) {
+  const meta = await sharp(filepath).metadata();
+  const needsRotate = meta.width > meta.height;
+  const pipeline = needsRotate ? sharp(filepath).rotate(90) : sharp(filepath);
+  const width = needsRotate ? meta.height : meta.width;
+  const height = needsRotate ? meta.width : meta.height;
+  return { pipeline, width, height };
+}
+
 async function printFile(filepath, copies = 1, type = 'single') {
   const printer = config.print.printer;
   let fileToPrint = filepath;
@@ -177,7 +189,8 @@ async function printFile(filepath, copies = 1, type = 'single') {
 
     const contentW = 1200 - TRIM_LEFT - TRIM_RIGHT - 2 * border;
     const contentH = 1800 - TRIM_TOP - TRIM_BOTTOM - 2 * border;
-    const content = await sharp(filepath).resize(contentW, contentH, { fit: 'cover' }).toBuffer();
+    const { pipeline } = await toPortrait(filepath);
+    const content = await pipeline.resize(contentW, contentH, { fit: 'cover' }).toBuffer();
 
     await sharp({ create: { width: 1200, height: 1800, channels: 3, background: backgroundColor } })
       .composite([{ input: content, left: TRIM_LEFT + border, top: TRIM_TOP + border }])
@@ -204,23 +217,25 @@ function escapeXml(str) {
     .replace(/'/g, '&apos;');
 }
 
-// Composite a text overlay banner onto a copy of the photo (bottom of image).
-// Leaves the original file untouched; saves a _print version alongside it.
+// Add a name/text banner in a new blank strip BELOW the photo (the photo itself stays
+// fully uncovered). Leaves the original file untouched; saves a _print version alongside it.
 // Returns the print copy path, or null if template is disabled.
 async function applyTemplate(filepath) {
   if (!config.template?.enabled || !config.template?.text) return null;
 
-  const { width, height } = await sharp(filepath).metadata();
+  const { pipeline, width, height } = await toPortrait(filepath);
   const text = escapeXml(config.template.text);
   const fontSize = Math.round((config.template.fontSize || 48) * (width / 600));
   const fontColor = config.template.fontColor || '#ffffff';
   const overlayColor = config.template.overlayColor || 'rgba(0,0,0,0.5)';
-  const bannerH = Math.round(fontSize * 2.4);
-  const bannerY = height - bannerH;
-  const textY = bannerY + Math.round(bannerH / 2);
+  // Height of the new blank strip added below the photo, scaled from a 600px-wide
+  // reference (like fontSize) so it stays proportional at any source resolution.
+  // Adjustable in the admin panel (template.bannerHeight).
+  const bannerH = Math.round((config.template.bannerHeight ?? 100) * (width / 600));
+  const newHeight = height + bannerH;
+  const textY = height + Math.round(bannerH / 2);
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-    <rect x="0" y="${bannerY}" width="${width}" height="${bannerH}" fill="${overlayColor}"/>
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${newHeight}">
     <text x="${Math.round(width / 2)}" y="${textY}"
       text-anchor="middle" dominant-baseline="middle"
       font-size="${fontSize}" fill="${fontColor}" font-family="Georgia, serif">${text}</text>
@@ -230,7 +245,8 @@ async function applyTemplate(filepath) {
   const ext = path.extname(filepath);
   const printPath = filepath.replace(new RegExp(`${ext}$`), `_print${ext}`);
 
-  await sharp(filepath)
+  await pipeline
+    .extend({ bottom: bannerH, background: overlayColor })
     .composite([{ input: Buffer.from(svg), blend: 'over' }])
     .jpeg({ quality: 95 })
     .toFile(printPath);
@@ -322,27 +338,9 @@ app.post('/print', async (req, res) => {
       // Optionally composite template on-the-fly to a temp file, then print it
     let fileToPrint = filepath;
     let tempPath = null;
-    if (withTemplate && config.template?.enabled && config.template?.text) {
-      const ext = path.extname(filepath);
-      tempPath = filepath.replace(new RegExp(`${ext}$`), `_tmp_print_${Date.now()}${ext}`);
-      const { width, height } = await sharp(filepath).metadata();
-      const text = escapeXml(config.template.text);
-      const fontColor = config.template.fontColor || '#ffffff';
-      const overlayColor = config.template.overlayColor || 'rgba(0,0,0,0.5)';
-      const bannerH = Math.round(fontSize * 2.4);
-      const bannerY = height - bannerH;
-      const textY = bannerY + Math.round(bannerH / 2);
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-        <rect x="0" y="${bannerY}" width="${width}" height="${bannerH}" fill="${overlayColor}"/>
-        <text x="${Math.round(width / 2)}" y="${textY}"
-          text-anchor="middle" dominant-baseline="middle"
-          font-size="${fontSize}" fill="${fontColor}" font-family="Georgia, serif">${text}</text>
-      </svg>`;
-      await sharp(filepath)
-        .composite([{ input: Buffer.from(svg), blend: 'over' }])
-        .jpeg({ quality: 95 })
-        .toFile(tempPath);
-      fileToPrint = tempPath;
+    if (withTemplate) {
+      tempPath = await applyTemplate(filepath);
+      if (tempPath) fileToPrint = tempPath;
     }
 
     const copies = type === 'collage' ? config.print.collagePrintCopies : config.print.singlePrintCopies;

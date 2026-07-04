@@ -47,6 +47,7 @@
   },
   "template": {
     "enabled": true,
-    "text": "Your Names · Your Date"
+    "text": "Your Names · Your Date",
+    "bannerHeight": 100
   }
 }

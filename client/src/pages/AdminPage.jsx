@@ -272,6 +272,8 @@ export default function AdminPage({ onExit }) {
                 onChange={(v) => set('template.fontSize', v)} min={20} max={120} />
               <ColorField label="Font Color" value={config.template?.fontColor ?? '#ffffff'}
                 onChange={(v) => set('template.fontColor', v)} />
+              <NumberField label="Banner Height (px at 600px width)" value={config.template?.bannerHeight ?? 100}
+                onChange={(v) => set('template.bannerHeight', v)} min={40} max={400} />
             </section>
 
             {/* Booth */}
