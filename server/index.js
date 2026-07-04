@@ -251,7 +251,7 @@ function buildBannerSvg(width, bannerH) {
   const text = escapeXml(config.template.text);
   const fontSize = Math.round((config.template.fontSize || 48) * (width / 600));
   const fontColor = config.template.fontColor || '#ffffff';
-  const overlayColor = config.template.overlayColor || 'rgba(0,0,0,0.5)';
+  const overlayColor = config.template.overlayColor || '#000000';
   const textY = Math.round(bannerH / 2);
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${bannerH}">

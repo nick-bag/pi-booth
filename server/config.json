@@ -48,6 +48,7 @@
   "template": {
     "enabled": true,
     "text": "Your Names · Your Date",
-    "bannerHeight": 100
+    "bannerHeight": 100,
+    "overlayColor": "#000000"
   }
 }
