@@ -18,7 +18,9 @@
     "enabled": false,
     "printer": "DNP_DS-RXH1",
     "singlePrintCopies": 1,
-    "collagePrintCopies": 2
+    "collagePrintCopies": 2,
+    "backgroundColor": "#1a1a1a",
+    "borderSize": 20
   },
   "collage": {
     "shots": 3,

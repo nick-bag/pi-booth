@@ -231,6 +231,10 @@ export default function AdminPage({ onExit }) {
                 onChange={(v) => set('print.singlePrintCopies', v)} min={1} max={5} />
               <NumberField label="Photo Strip Copies" value={config.print.collagePrintCopies}
                 onChange={(v) => set('print.collagePrintCopies', v)} min={1} max={5} />
+              <ColorField label="Background / Border Color" value={config.print?.backgroundColor ?? '#1a1a1a'}
+                onChange={(v) => set('print.backgroundColor', v)} />
+              <NumberField label="Border Size (px)" value={config.print?.borderSize ?? 20}
+                onChange={(v) => set('print.borderSize', v)} min={0} max={100} />
             </section>
 
             {/* Features */}

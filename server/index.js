@@ -80,22 +80,24 @@ async function buildCollageStrip(imagePaths) {
   // 2x6 at 300dpi = 600x1800px
   const STRIP_W = 600;
   const STRIP_H = 1800;
-  const GAP = 20;
+  const border = config.print?.borderSize ?? 20;
+  const backgroundColor = config.print?.backgroundColor ?? '#1a1a1a';
   const n = imagePaths.length;
-  const THUMB_H = Math.floor((STRIP_H - GAP * (n - 1)) / n);
+  const THUMB_W = STRIP_W - border * 2;
+  const THUMB_H = Math.floor((STRIP_H - border * (n + 1)) / n);
 
   const composites = await Promise.all(
     imagePaths.map(async (imgPath, i) => {
       const resized = await sharp(imgPath)
-        .resize(STRIP_W, THUMB_H, { fit: 'cover' })
+        .resize(THUMB_W, THUMB_H, { fit: 'cover' })
         .toBuffer();
-      return { input: resized, top: i * (THUMB_H + GAP), left: 0 };
+      return { input: resized, top: border + i * (THUMB_H + border), left: border };
     })
   );
 
   const outputPath = path.join(PHOTOS_DIR, `collage_${Date.now()}.jpg`);
   await sharp({
-    create: { width: STRIP_W, height: STRIP_H, channels: 3, background: '#1a1a1a' },
+    create: { width: STRIP_W, height: STRIP_H, channels: 3, background: backgroundColor },
   })
     .composite(composites)
     .jpeg({ quality: 95 })
@@ -124,9 +126,20 @@ async function printFile(filepath, copies = 1, type = 'single') {
       .toFile(tmpPng);
     fileToPrint = tmpPng;
   } else {
-    // Single photo — convert JPEG to PNG (imagetoraster filter doesn't support JPEG)
+    // Single photo — add border and convert to PNG (imagetoraster filter doesn't support JPEG)
     tmpPng = filepath.replace(/\.(jpg|jpeg)$/i, `_print_tmp_${Date.now()}.png`);
-    await execAsync(`convert "${filepath}" "${tmpPng}"`);
+    const border = config.print?.borderSize ?? 0;
+    const backgroundColor = config.print?.backgroundColor ?? '#1a1a1a';
+    if (border > 0) {
+      const { width } = await sharp(filepath).metadata();
+      const scaledBorder = Math.round(border * (width / 600));
+      await sharp(filepath)
+        .extend({ top: scaledBorder, bottom: scaledBorder, left: scaledBorder, right: scaledBorder, background: backgroundColor })
+        .png()
+        .toFile(tmpPng);
+    } else {
+      await execAsync(`convert "${filepath}" "${tmpPng}"`);
+    }
     fileToPrint = tmpPng;
   }
 
@@ -192,7 +205,12 @@ app.get('/config', (req, res) => {
     single: config.single,
     gallery: config.gallery,
     booth: config.booth,
-    print: { enabled: config.print.enabled },
+    template: { enabled: config.template?.enabled ?? false },
+    print: {
+      enabled: config.print.enabled,
+      singlePrintCopies: config.print.singlePrintCopies,
+      collagePrintCopies: config.print.collagePrintCopies,
+    },
   });
 });
 
