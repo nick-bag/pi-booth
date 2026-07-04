@@ -115,15 +115,18 @@ async function printFile(filepath, copies = 1, type = 'single') {
   if (type === 'collage') {
     // Place two copies of the strip side-by-side on a 4x6 canvas (1200x1800 at 300dpi).
     // Printer cuts at midpoint via w288h432-div2, producing two full 2x6 strips.
-    // buildCollageStrip already bakes equal borders on all four sides of the strip,
-    // so placing both copies at x:0 and x:600 gives equal borders after cutting.
+    // Each strip is shrunk to (600 - border) wide so the canvas background fills a
+    // full border-wide gap on each side of the cut. This survives the physical cut intact.
     tmpPng = filepath.replace(/\.(jpg|jpeg)$/i, `_print_tmp_${Date.now()}.png`);
+    const border = config.print?.borderSize ?? 20;
     const backgroundColor = config.print?.backgroundColor ?? '#1a1a1a';
-    const strip = await sharp(filepath).toBuffer();
+    const strip = await sharp(filepath)
+      .resize(600 - border, 1800, { fit: 'fill' })
+      .toBuffer();
     await sharp({ create: { width: 1200, height: 1800, channels: 3, background: backgroundColor } })
       .composite([
         { input: strip, left: 0, top: 0 },
-        { input: strip, left: 600, top: 0 },
+        { input: strip, left: 600 + border, top: 0 },
       ])
       .png()
       .toFile(tmpPng);
