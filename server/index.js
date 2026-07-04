@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { WebSocketServer } from 'ws';
-import { createServer } from 'https';
+import { createServer as createHttpsServer } from 'https';
+import { createServer as createHttpServer } from 'http';
 import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -36,7 +37,7 @@ const PHOTOS_DIR = path.join(__dirname, '../data/photos');
 if (!existsSync(PHOTOS_DIR)) mkdirSync(PHOTOS_DIR, { recursive: true });
 
 const app = express();
-const server = createServer(httpsOptions, app);
+const server = createHttpsServer(httpsOptions, app);
 const wss = new WebSocketServer({ server });
 
 app.use(cors());
@@ -371,4 +372,19 @@ server.listen(PORT, '0.0.0.0', () => {
     app.get('*', (req, res) => res.sendFile(path.join(CLIENT_DIST, 'index.html')));
   }
   console.log(`Pi Booth server running on https://0.0.0.0:${PORT}`);
+});
+
+// Plain HTTP server on port 80 — only serves the cert download.
+// Service workers are HTTPS-only, so this route is never intercepted by them.
+// Visit http://booth.local/cert to download the cert before trusting HTTPS.
+const httpApp = express();
+httpApp.get('/cert', (req, res) => {
+  if (!existsSync(CERT_PATH)) return res.status(404).send('Certificate not found');
+  res.setHeader('Content-Type', 'application/x-x509-ca-cert');
+  res.setHeader('Content-Disposition', 'attachment; filename="pi-booth.crt"');
+  res.sendFile(CERT_PATH);
+});
+httpApp.use((req, res) => res.redirect(`https://${req.headers.host}${req.url}`));
+createHttpServer(httpApp).listen(80, '0.0.0.0', () => {
+  console.log('Pi Booth cert server running on http://0.0.0.0:80');
 });
