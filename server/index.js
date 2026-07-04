@@ -332,9 +332,9 @@ app.get('/gallery', async (req, res) => {
 });
 
 // POST /admin/print-calibration - print a ruler test pattern to measure exact cut bleed.
-// Draws tick marks every 10px and labels every 50px across the full 1200px width,
-// so the printed output on each side of the cut can be read directly to determine
-// exactly how many pixels the cutter removes on each side of the midpoint (x=600).
+// Draws tick marks every 10px labeled with the ABSOLUTE pixel position (0-1200),
+// colors the left half light blue and the right half light pink so the two pieces
+// are unambiguous after cutting, and marks the intended cut line in red at x=600.
 app.post('/admin/print-calibration', async (req, res) => {
   try {
     const { pin } = req.body;
@@ -350,16 +350,19 @@ app.post('/admin/print-calibration', async (req, res) => {
       ticks += `<line x1="${x}" y1="0" x2="${x}" y2="${tickH}" stroke="black" stroke-width="${isMajor ? 3 : 1}"/>`;
       ticks += `<line x1="${x}" y1="${H}" x2="${x}" y2="${H - tickH}" stroke="black" stroke-width="${isMajor ? 3 : 1}"/>`;
       if (isMajor) {
-        const label = x - 600; // offset relative to the cut midpoint
-        ticks += `<text x="${x}" y="${tickH + 30}" text-anchor="middle" font-size="24" fill="black">${label}</text>`;
-        ticks += `<text x="${x}" y="${H - tickH - 15}" text-anchor="middle" font-size="24" fill="black">${label}</text>`;
+        // Absolute pixel position, not offset — avoids sign confusion
+        ticks += `<text x="${x}" y="${tickH + 30}" text-anchor="middle" font-size="22" fill="black">${x}</text>`;
+        ticks += `<text x="${x}" y="${H - tickH - 15}" text-anchor="middle" font-size="22" fill="black">${x}</text>`;
       }
     }
-    // Vertical reference line at the cut midpoint
-    ticks += `<line x1="${W / 2}" y1="0" x2="${W / 2}" y2="${H}" stroke="red" stroke-width="2"/>`;
+    // Vertical reference line at the intended cut midpoint
+    ticks += `<line x1="${W / 2}" y1="0" x2="${W / 2}" y2="${H}" stroke="red" stroke-width="4"/>`;
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
-      <rect x="0" y="0" width="${W}" height="${H}" fill="white"/>
+      <rect x="0" y="0" width="${W / 2}" height="${H}" fill="#cfe8ff"/>
+      <rect x="${W / 2}" y="0" width="${W / 2}" height="${H}" fill="#ffd6e8"/>
+      <text x="${W / 4}" y="${H / 2}" text-anchor="middle" font-size="60" fill="black">LEFT</text>
+      <text x="${(3 * W) / 4}" y="${H / 2}" text-anchor="middle" font-size="60" fill="black">RIGHT</text>
       ${ticks}
     </svg>`;
 
