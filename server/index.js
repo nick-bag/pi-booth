@@ -115,26 +115,15 @@ async function printFile(filepath, copies = 1, type = 'single') {
   if (type === 'collage') {
     // Place two copies of the strip side-by-side on a 4x6 canvas (1200x1800 at 300dpi).
     // Printer cuts at midpoint via w288h432-div2, producing two full 2x6 strips.
-    // The cutter physically eats ~60px total (CUT_BLEED px from each side of the cut).
-    // We crop baked-in side borders from the strip, resize to fit the usable content
-    // area, and position so exactly `border` px of background remains on all four sides
-    // of each 2x6 after cutting.
+    // Cut-line bleed is compensated by the driver's StpNoCutWaste option (see lp command
+    // below) rather than by guessing pixel offsets in software.
     tmpPng = filepath.replace(/\.(jpg|jpeg)$/i, `_print_tmp_${Date.now()}.png`);
-    const border = config.print?.borderSize ?? 20;
     const backgroundColor = config.print?.backgroundColor ?? '#1a1a1a';
-    const CUT_BLEED = 30; // px eaten by the cutter on each side of the cut line
-    const innerW = 600 - 2 * border - CUT_BLEED;
-
-    // Crop baked-in side borders from the strip then resize to innerW
-    const inner = await sharp(filepath)
-      .extract({ left: border, top: 0, width: 600 - 2 * border, height: 1800 })
-      .resize(innerW, 1800, { fit: 'fill' })
-      .toBuffer();
-
+    const strip = await sharp(filepath).toBuffer();
     await sharp({ create: { width: 1200, height: 1800, channels: 3, background: backgroundColor } })
       .composite([
-        { input: inner, left: border, top: 0 },
-        { input: inner, left: 600 + CUT_BLEED + border, top: 0 },
+        { input: strip, left: 0, top: 0 },
+        { input: strip, left: 600, top: 0 },
       ])
       .png()
       .toFile(tmpPng);
@@ -158,8 +147,9 @@ async function printFile(filepath, copies = 1, type = 'single') {
   }
 
   const mediaSize = type === 'collage' ? 'w288h432-div2' : 'w288h432';
+  const noCutWasteOpt = type === 'collage' ? '-o StpNoCutWaste=True' : '';
   try {
-    await execAsync(`lp -d "${printer}" -n ${copies} -o PageSize=${mediaSize} "${fileToPrint}"`);
+    await execAsync(`lp -d "${printer}" -n ${copies} -o PageSize=${mediaSize} ${noCutWasteOpt} "${fileToPrint}"`);
   } finally {
     if (tmpPng) await unlink(tmpPng).catch(() => {});
   }
