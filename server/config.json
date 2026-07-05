@@ -42,7 +42,8 @@
     "enabled": true
   },
   "booth": {
-    "autoReturnSeconds": 10
+    "autoReturnSeconds": 10,
+    "previewBeforePrintSeconds": 5
   },
   "template": {
     "enabled": true,

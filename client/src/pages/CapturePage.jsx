@@ -32,10 +32,25 @@ export default function CapturePage({ type, config, camReady, onBack }) {
   const shotPreviewDuration = (config?.collage?.shotPreviewSeconds ?? 3) * 1000;
   const autoReturnSeconds = config?.booth?.autoReturnSeconds ?? 10;
 
-  // Auto-print when entering PREVIEW phase (if print enabled)
+  // Auto-print after a delay when entering PREVIEW phase (if print enabled) — gives
+  // the guest time to actually see the final photo before it's whisked off to print.
+  const printDelayMs = (config?.booth?.previewBeforePrintSeconds ?? 5) * 1000;
+  const [printCountdown, setPrintCountdown] = useState(null);
   useEffect(() => {
     if (phase !== PHASES.PREVIEW || !result || !config?.print?.enabled) return;
-    handlePrint();
+    if (printDelayMs <= 0) {
+      handlePrint();
+      return;
+    }
+    setPrintCountdown(Math.ceil(printDelayMs / 1000));
+    const interval = setInterval(() => {
+      setPrintCountdown((c) => (c <= 1 ? 0 : c - 1));
+    }, 1000);
+    const timeout = setTimeout(() => {
+      setPrintCountdown(null);
+      handlePrint();
+    }, printDelayMs);
+    return () => { clearInterval(interval); clearTimeout(timeout); };
   }, [phase, result]);
 
 
@@ -171,7 +186,10 @@ export default function CapturePage({ type, config, camReady, onBack }) {
         <img src={result.url} alt="Your photo" className={styles.previewImg} />
         <div className={styles.previewActions}>
           <BigButton onClick={onBack} variant="secondary">Start Over</BigButton>
-          {returnCount !== null && (
+          {printCountdown !== null && (
+            <p className={styles.autoReturn}>Printing in {printCountdown}s…</p>
+          )}
+          {printCountdown === null && returnCount !== null && (
             <p className={styles.autoReturn}>Returning in {returnCount}s…</p>
           )}
         </div>

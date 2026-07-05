@@ -299,6 +299,8 @@ export default function AdminPage({ onExit }) {
               <h2 className={styles.sectionTitle}>Booth</h2>
               <NumberField label="Auto-return After (sec, 0 = off)" value={config.booth?.autoReturnSeconds ?? 10}
                 onChange={(v) => set('booth.autoReturnSeconds', v)} min={0} max={60} />
+              <NumberField label="Preview Time Before Auto-Print (sec, 0 = instant)" value={config.booth?.previewBeforePrintSeconds ?? 5}
+                onChange={(v) => set('booth.previewBeforePrintSeconds', v)} min={0} max={30} />
             </section>
 
             {/* Admin PIN */}
