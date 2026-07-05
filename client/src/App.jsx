@@ -50,9 +50,7 @@ export default function App() {
     if (!config?.wedding) return;
     const root = document.documentElement;
     if (config.wedding.primaryColor) root.style.setProperty('--primary', config.wedding.primaryColor);
-    if (config.wedding.backgroundColor) root.style.setProperty('--bg', config.wedding.backgroundColor);
     if (config.wedding.textColor) root.style.setProperty('--text', config.wedding.textColor);
-    document.body.style.background = config.wedding.backgroundColor || '#1a1a1a';
   }, [config]);
 
   function handleTitleTap() {

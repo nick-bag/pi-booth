@@ -214,8 +214,6 @@ export default function AdminPage({ onExit }) {
               <h2 className={styles.sectionTitle}>Colors</h2>
               <ColorField label="Accent Color" value={config.wedding.primaryColor}
                 onChange={(v) => set('wedding.primaryColor', v)} />
-              <ColorField label="Background" value={config.wedding.backgroundColor}
-                onChange={(v) => set('wedding.backgroundColor', v)} />
               <ColorField label="Text" value={config.wedding.textColor}
                 onChange={(v) => set('wedding.textColor', v)} />
             </section>
