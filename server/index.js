@@ -431,17 +431,22 @@ app.get('/gallery', async (req, res) => {
   }
 });
 
+// Middleware: validates req.body.pin against the configured admin PIN.
+// Shared by all /admin routes that require authentication.
+function requirePin(req, res, next) {
+  const { pin } = req.body;
+  if (pin !== String(config.admin?.pin ?? '1234')) {
+    return res.status(401).json({ success: false, error: 'Invalid PIN' });
+  }
+  next();
+}
+
 // POST /admin/print-calibration - print a ruler test pattern to measure exact cut bleed.
 // Draws tick marks every 10px labeled with the ABSOLUTE pixel position (0-1200),
 // colors the left half light blue and the right half light pink so the two pieces
 // are unambiguous after cutting, and marks the intended cut line in red at x=600.
-app.post('/admin/print-calibration', async (req, res) => {
+app.post('/admin/print-calibration', requirePin, async (req, res) => {
   try {
-    const { pin } = req.body;
-    if (pin !== String(config.admin?.pin ?? '1234')) {
-      return res.status(401).json({ success: false, error: 'Invalid PIN' });
-    }
-
     const W = 1200, H = 1800;
     let ticks = '';
     for (let x = 0; x <= W; x += 10) {
@@ -504,12 +509,9 @@ app.get('/admin/config', (req, res) => {
 });
 
 // POST /admin/config - save updated config
-app.post('/admin/config', async (req, res) => {
+app.post('/admin/config', requirePin, async (req, res) => {
   try {
-    const { pin, updates } = req.body;
-    if (pin !== String(config.admin?.pin ?? '1234')) {
-      return res.status(401).json({ success: false, error: 'Invalid PIN' });
-    }
+    const { updates } = req.body;
     // Deep merge updates into config
     config = deepMerge(config, updates);
     await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2));
@@ -522,12 +524,8 @@ app.post('/admin/config', async (req, res) => {
 });
 
 // DELETE /admin/photos/:filename - delete a photo
-app.delete('/admin/photos/:filename', async (req, res) => {
+app.delete('/admin/photos/:filename', requirePin, async (req, res) => {
   try {
-    const { pin } = req.body;
-    if (pin !== String(config.admin?.pin ?? '1234')) {
-      return res.status(401).json({ success: false, error: 'Invalid PIN' });
-    }
     const filename = path.basename(req.params.filename); // sanitize
     const filepath = path.join(PHOTOS_DIR, filename);
     if (!existsSync(filepath)) return res.status(404).json({ success: false, error: 'File not found' });

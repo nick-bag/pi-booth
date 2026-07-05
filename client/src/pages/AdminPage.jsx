@@ -17,6 +17,7 @@ export default function AdminPage({ onExit }) {
   // Gallery state
   const [photos, setPhotos] = useState([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
+  const [galleryError, setGalleryError] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmPrint, setConfirmPrint] = useState(false);
@@ -26,15 +27,22 @@ export default function AdminPage({ onExit }) {
     fetch(API('/config'))
       .then((r) => r.json())
       .then(setConfig)
-      .catch(() => setError('Failed to load config'));
+      .catch((err) => {
+        console.error('Failed to load config:', err);
+        setError('Failed to load config');
+      });
   }, [unlocked]);
 
   useEffect(() => {
     if (!unlocked || tab !== 'gallery') return;
     setGalleryLoading(true);
+    setGalleryError('');
     apiGallery()
       .then((data) => setPhotos(data.photos))
-      .catch(console.error)
+      .catch((err) => {
+        console.error('Failed to load gallery:', err);
+        setGalleryError('Failed to load gallery');
+      })
       .finally(() => setGalleryLoading(false));
   }, [unlocked, tab]);
 
@@ -50,7 +58,10 @@ export default function AdminPage({ onExit }) {
       } else {
         setUnlocked(true);
       }
-    }).catch(() => setPinError('Server error'));
+    }).catch((err) => {
+      console.error('PIN check failed:', err);
+      setPinError('Server error');
+    });
   }
 
   async function handleSave() {
@@ -68,6 +79,7 @@ export default function AdminPage({ onExit }) {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {
+      console.error('Save failed:', e);
       setError(e.message);
     } finally {
       setSaving(false);
@@ -134,17 +146,23 @@ export default function AdminPage({ onExit }) {
         setSelectedPhoto(null);
         setConfirmDelete(false);
       } catch (e) {
+        console.error('Delete failed:', e);
         alert('Delete failed: ' + e.message);
       }
     }
 
     async function handlePrint(withTemplate) {
       setConfirmPrint(false);
-      await fetch('/api/print', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: selectedPhoto.filename, type: isCollage ? 'collage' : 'single', withTemplate }),
-      });
+      try {
+        await fetch('/api/print', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: selectedPhoto.filename, type: isCollage ? 'collage' : 'single', withTemplate }),
+        });
+      } catch (e) {
+        console.error('Print failed:', e);
+        alert('Print failed: ' + e.message);
+      }
     }
 
     return (
@@ -306,6 +324,8 @@ export default function AdminPage({ onExit }) {
         <div className={styles.galleryWrap}>
           {galleryLoading ? (
             <div className={styles.galleryEmpty}>Loading…</div>
+          ) : galleryError ? (
+            <div className={styles.galleryEmpty}>{galleryError}</div>
           ) : photos.length === 0 ? (
             <div className={styles.galleryEmpty}>No photos yet</div>
           ) : (
