@@ -195,7 +195,8 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
     const contentH = availableV - 2 * border - bannerH;
     const bannerTop = TRIM_TOP + border + contentH;
 
-    const bannerSvg = bannerH > 0 ? buildBannerSvg(stripW, bannerH) : null;
+    // Built per-side (not once at full strip width) so the banner is inset by the same border/trim
+    // margins as the photo content — otherwise it would bleed under the outer border on each side.
 
     // Reflow (not stretch) each individual photo into the new content box: re-crop each photo
     // with 'cover' so aspect ratio is preserved (a subtle uniform zoom/crop instead of distortion),
@@ -230,7 +231,9 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
     const leftContentW = stripW - TRIM_LEFT - 2 * border;
     const leftContent = await reflowPhotos(leftContentW);
     const leftComposites = [{ input: leftContent, left: TRIM_LEFT + border, top: TRIM_TOP + border }];
-    if (bannerSvg) leftComposites.push({ input: bannerSvg, left: 0, top: bannerTop });
+    if (bannerH > 0) {
+      leftComposites.push({ input: buildBannerSvg(leftContentW, bannerH), left: TRIM_LEFT + border, top: bannerTop });
+    }
     const leftCopy = await sharp({ create: { width: stripW, height: stripH, channels: 3, background: backgroundColor } })
       .composite(leftComposites)
       .png()
@@ -241,7 +244,9 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
     const rightContentW = stripW - TRIM_RIGHT - 2 * border;
     const rightContent = await reflowPhotos(rightContentW);
     const rightComposites = [{ input: rightContent, left: border, top: TRIM_TOP + border }];
-    if (bannerSvg) rightComposites.push({ input: bannerSvg, left: 0, top: bannerTop });
+    if (bannerH > 0) {
+      rightComposites.push({ input: buildBannerSvg(rightContentW, bannerH), left: border, top: bannerTop });
+    }
     const rightCopy = await sharp({ create: { width: stripW, height: stripH, channels: 3, background: backgroundColor } })
       .composite(rightComposites)
       .png()
@@ -274,7 +279,9 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
     const content = await pipeline.resize(contentW, contentH, { fit: 'cover' }).toBuffer();
 
     const composites = [{ input: content, left: TRIM_LEFT + border, top: TRIM_TOP + border }];
-    if (bannerH > 0) composites.push({ input: buildBannerSvg(1200, bannerH), left: 0, top: bannerTop });
+    if (bannerH > 0) {
+      composites.push({ input: buildBannerSvg(contentW, bannerH), left: TRIM_LEFT + border, top: bannerTop });
+    }
 
     await sharp({ create: { width: 1200, height: 1800, channels: 3, background: backgroundColor } })
       .composite(composites)
