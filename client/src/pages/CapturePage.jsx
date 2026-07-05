@@ -215,7 +215,7 @@ export default function CapturePage({ type, config, camReady, onBack }) {
           {type === 'collage' ? `${config?.print?.collagePrintCopies ?? 2} copies` : ''}
         </p>
         <BigButton onClick={onBack} variant="secondary" style={{ marginTop: '2rem' }}>
-          ↩ Take Another
+          ↩ Start Over
         </BigButton>
         {returnCount !== null && (
           <p className={styles.autoReturn}>Returning in {returnCount}s…</p>
