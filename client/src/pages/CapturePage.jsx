@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import Countdown from '../components/Countdown.jsx';
 import BigButton from '../components/BigButton.jsx';
 import { useCountdown } from '../hooks/useCountdown.js';
-import { apiCapture, apiCaptureShot, apiCollagueBuild, apiPrint } from '../hooks/usePhotobooth.js';
+import { apiCapture, apiCaptureShot, apiCollageBuild, apiPrint } from '../hooks/usePhotobooth.js';
 import styles from './CapturePage.module.css';
 
 const PHASES = {
@@ -86,7 +86,7 @@ export default function CapturePage({ type, config, camReady, onBack }) {
         } else {
           // All shots captured — build the strip
           setPhase(PHASES.BUILDING);
-          const collage = await apiCollagueBuild(shotFilenames.current);
+          const collage = await apiCollageBuild(shotFilenames.current);
           setResult(collage);
           setPhase(PHASES.PREVIEW);
         }

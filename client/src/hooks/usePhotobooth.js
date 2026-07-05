@@ -38,7 +38,7 @@ export async function apiCaptureShot() {
   return res.json();
 }
 
-export async function apiCollagueBuild(filenames) {
+export async function apiCollageBuild(filenames) {
   const res = await fetch('/api/collage/build', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

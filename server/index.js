@@ -5,7 +5,7 @@ import { createServer } from 'https';
 import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { readdir, readFile, writeFile, unlink } from 'fs/promises';
+import { readdir, writeFile, unlink } from 'fs/promises';
 import sharp from 'sharp';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
