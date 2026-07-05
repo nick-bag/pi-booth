@@ -169,10 +169,34 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
 
     const bannerSvg = bannerH > 0 ? buildBannerSvg(stripW, bannerH) : null;
 
+    // Reflow (not stretch) each individual photo into the new content box: re-crop each photo
+    // with 'cover' so aspect ratio is preserved (a subtle uniform zoom/crop instead of distortion),
+    // rather than resizing the whole composited block, which would squish photos unevenly/unnaturally.
+    const n = config.collage?.shots ?? 3;
+    const oldThumbW = stripW - 2 * border;
+    const oldThumbH = Math.floor((stripH - border * (n + 1)) / n);
+    const newThumbH = Math.floor((contentH - border * (n - 1)) / n);
+
+    async function reflowPhotos(newThumbW) {
+      const composites = [];
+      for (let i = 0; i < n; i++) {
+        const photoBuf = await sharp(contentBuf)
+          .extract({ left: 0, top: i * (oldThumbH + border), width: oldThumbW, height: oldThumbH })
+          .resize(newThumbW, newThumbH, { fit: 'cover' })
+          .toBuffer();
+        composites.push({ input: photoBuf, left: 0, top: i * (newThumbH + border) });
+      }
+      const totalH = n * newThumbH + (n - 1) * border;
+      return sharp({ create: { width: newThumbW, height: totalH, channels: 3, background: backgroundColor } })
+        .composite(composites)
+        .png()
+        .toBuffer();
+    }
+
     // Left copy: outer border compensated on the left, top and bottom; cut-side (right) border
     // stays as-is since the cut loses nothing.
     const leftContentW = stripW - TRIM_LEFT - 2 * border;
-    const leftContent = await sharp(contentBuf).resize(leftContentW, contentH, { fit: 'fill' }).toBuffer();
+    const leftContent = await reflowPhotos(leftContentW);
     const leftComposites = [{ input: leftContent, left: TRIM_LEFT + border, top: TRIM_TOP + border }];
     if (bannerSvg) leftComposites.push({ input: bannerSvg, left: 0, top: bannerTop });
     const leftCopy = await sharp({ create: { width: stripW, height: stripH, channels: 3, background: backgroundColor } })
@@ -183,7 +207,7 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
     // Right copy: outer border compensated on the right, top and bottom; cut-side (left)
     // border stays as-is.
     const rightContentW = stripW - TRIM_RIGHT - 2 * border;
-    const rightContent = await sharp(contentBuf).resize(rightContentW, contentH, { fit: 'fill' }).toBuffer();
+    const rightContent = await reflowPhotos(rightContentW);
     const rightComposites = [{ input: rightContent, left: border, top: TRIM_TOP + border }];
     if (bannerSvg) rightComposites.push({ input: bannerSvg, left: 0, top: bannerTop });
     const rightCopy = await sharp({ create: { width: stripW, height: stripH, channels: 3, background: backgroundColor } })
