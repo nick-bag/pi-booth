@@ -303,6 +303,7 @@ export default function AdminPage({ onExit }) {
                 onChange={(v) => set('booth.previewBeforePrintSeconds', v)} min={0} max={30} />
               <NumberField label="Camera View Dim Overlay (%, 0 = off)" value={config.booth?.liveOverlayOpacity ?? 35}
                 onChange={(v) => set('booth.liveOverlayOpacity', v)} min={0} max={100} />
+              <p className={styles.fieldHint}>Applies to the idle start screen and the countdown/capture screens.</p>
             </section>
 
             {/* Admin PIN */}

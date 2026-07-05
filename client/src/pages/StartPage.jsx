@@ -4,9 +4,10 @@ import styles from './StartPage.module.css';
 export default function StartPage({ config, onSelect, onTitleTap }) {
   const title = config?.wedding?.title || 'Photo Booth';
   const subtitle = config?.wedding?.subtitle || '';
+  const overlayStyle = { '--live-overlay-opacity': (config?.booth?.liveOverlayOpacity ?? 35) / 100 };
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} style={overlayStyle}>
       <div className={styles.header}>
         <h1 className={styles.title} onClick={onTitleTap}>{title}</h1>
         {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
