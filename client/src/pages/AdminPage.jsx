@@ -332,7 +332,7 @@ export default function AdminPage({ onExit }) {
             <div className={styles.galleryGrid}>
               {photos.map((photo) => (
                 <div key={photo.filename} className={styles.galleryThumb} onClick={() => setSelectedPhoto(photo)}>
-                  <img src={photo.url} alt={photo.filename} />
+                  <img src={photo.thumbUrl ?? photo.url} alt={photo.filename} loading="lazy" />
                 </div>
               ))}
             </div>

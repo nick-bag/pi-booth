@@ -32,8 +32,10 @@ let config = require('./config.json');
 
 const execAsync = promisify(exec);
 const PHOTOS_DIR = path.join(__dirname, '../data/photos');
+const THUMBS_DIR = path.join(PHOTOS_DIR, '.thumbs');
 
 if (!existsSync(PHOTOS_DIR)) mkdirSync(PHOTOS_DIR, { recursive: true });
+if (!existsSync(THUMBS_DIR)) mkdirSync(THUMBS_DIR, { recursive: true });
 
 const app = express();
 const server = createServer(httpsOptions, app);
@@ -42,6 +44,30 @@ const wss = new WebSocketServer({ server });
 app.use(cors());
 app.use(express.json());
 app.use('/photos', express.static(PHOTOS_DIR));
+
+// GET /photos/thumb/:filename - resized, cached thumbnail for gallery grids.
+// Full-resolution captures can be several MB each; serving those directly in a
+// grid of dozens of photos is what was causing slow gallery load times.
+app.get('/photos/thumb/:filename', async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename); // sanitize
+    const srcPath = path.join(PHOTOS_DIR, filename);
+    if (!existsSync(srcPath)) return res.status(404).end();
+
+    const thumbPath = path.join(THUMBS_DIR, `${filename}.jpg`);
+    if (!existsSync(thumbPath)) {
+      await sharp(srcPath)
+        .resize({ width: 400, withoutEnlargement: true })
+        .jpeg({ quality: 70 })
+        .toFile(thumbPath);
+    }
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    res.sendFile(thumbPath);
+  } catch (err) {
+    console.error('Thumbnail error:', err);
+    res.status(500).end();
+  }
+});
 
 // Strip /api prefix — Vite proxy does this in dev, we do it here in production
 app.use((req, res, next) => {
@@ -424,7 +450,7 @@ app.get('/gallery', async (req, res) => {
       .filter((f) => f.match(/\.(jpg|jpeg|png)$/i))
       .sort()
       .reverse()
-      .map((f) => ({ filename: f, url: `/photos/${f}` }));
+      .map((f) => ({ filename: f, url: `/photos/${f}`, thumbUrl: `/photos/thumb/${f}` }));
     res.json({ photos });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -530,6 +556,7 @@ app.delete('/admin/photos/:filename', requirePin, async (req, res) => {
     const filepath = path.join(PHOTOS_DIR, filename);
     if (!existsSync(filepath)) return res.status(404).json({ success: false, error: 'File not found' });
     await unlink(filepath);
+    await unlink(path.join(THUMBS_DIR, `${filename}.jpg`)).catch(() => {});
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
