@@ -260,10 +260,42 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
   const mediaSize = type === 'collage' ? 'w288h432-div2' : 'w288h432';
   const noCutWasteOpt = type === 'collage' ? '-o StpNoCutWaste=True' : '';
   try {
+    // `lp` only confirms the job was accepted into the CUPS queue — CUPS will happily queue a
+    // job even if the printer's USB cable is unplugged, reporting the job as "completed" without
+    // ever actually printing. Verify the printer is currently detected (live USB probe) first, so
+    // we can fail loudly instead of reporting false success.
+    if (!(await isPrinterConnected(printer))) {
+      throw new Error(`Printer "${printer}" is not connected — check the USB cable and try again.`);
+    }
     await execAsync(`lp -d "${printer}" -n ${copies} -o PageSize=${mediaSize} ${noCutWasteOpt} "${fileToPrint}"`);
   } finally {
     if (tmpPng) await unlink(tmpPng).catch(() => {});
   }
+}
+
+// TODO: finish this once we know the DNP DS-RX1's actual USB vendor/product ID from `lsusb`
+// (couldn't capture it because the printer was unplugged at the time). Once known, replace the
+// placeholder below with the real ID, e.g. '1343:0004' for '1343' vendor and '0004' product.
+// `lpstat -v`'s device URI check and `lpinfo -v` both proved unreliable for detecting whether
+// the DS-RX1 is actually connected via USB — lpinfo -v didn't list any usb:// backends at all,
+// even with the printer plugged in and printing successfully. Matching lsusb output against the
+// printer's specific vendor:product ID is more likely to work.
+const DS_RX1_USB_ID_PLACEHOLDER = 'XXXX:XXXX'; // e.g. '1343:0004' — fill in from `lsusb` output
+
+async function isPrinterConnected(printer) {
+  // Disabled until DS_RX1_USB_ID_PLACEHOLDER is filled in with the real vendor:product ID.
+  // Currently always reports "connected" so we don't block real prints on a broken check.
+  return true;
+
+  /* eslint-disable no-unreachable
+  try {
+    const { stdout } = await execAsync('lsusb');
+    return stdout.includes(DS_RX1_USB_ID_PLACEHOLDER);
+  } catch (err) {
+    console.warn('Printer connectivity check failed, proceeding anyway:', err.message);
+    return true;
+  }
+  */
 }
 
 function escapeXml(str) {
