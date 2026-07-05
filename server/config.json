@@ -43,7 +43,8 @@
   },
   "booth": {
     "autoReturnSeconds": 10,
-    "previewBeforePrintSeconds": 5
+    "previewBeforePrintSeconds": 5,
+    "liveOverlayOpacity": 35
   },
   "template": {
     "enabled": true,

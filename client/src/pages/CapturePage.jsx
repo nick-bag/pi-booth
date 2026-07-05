@@ -31,6 +31,7 @@ export default function CapturePage({ type, config, camReady, onBack }) {
     : config?.collage?.countdownSeconds ?? 3;
   const shotPreviewDuration = (config?.collage?.shotPreviewSeconds ?? 3) * 1000;
   const autoReturnSeconds = config?.booth?.autoReturnSeconds ?? 10;
+  const liveOverlayStyle = { '--live-overlay-opacity': (config?.booth?.liveOverlayOpacity ?? 35) / 100 };
 
   // Auto-print after a delay when entering PREVIEW phase (if print enabled) — gives
   // the guest time to actually see the final photo before it's whisked off to print.
@@ -126,7 +127,7 @@ export default function CapturePage({ type, config, camReady, onBack }) {
   if (phase === PHASES.CAM_LOADING) {
     return (
       <div className={styles.liveWrap}>
-        <div className={styles.liveOverlay}>
+        <div className={styles.liveOverlay} style={liveOverlayStyle}>
           <div className={styles.camLoading}>
             <div className={styles.spinner} />
           </div>
@@ -141,7 +142,7 @@ export default function CapturePage({ type, config, camReady, onBack }) {
       : 'Smile!';
     return (
       <div className={styles.liveWrap}>
-        <div className={styles.liveOverlay}>
+        <div className={styles.liveOverlay} style={liveOverlayStyle}>
           <Countdown count={count} label={label} />
         </div>
       </div>
@@ -151,7 +152,7 @@ export default function CapturePage({ type, config, camReady, onBack }) {
   if (phase === PHASES.CAPTURING) {
     return (
       <div className={styles.liveWrap}>
-        <div className={styles.liveOverlay}>
+        <div className={styles.liveOverlay} style={liveOverlayStyle}>
           <div className={styles.center}>
             <div className={styles.spinner} />
           </div>

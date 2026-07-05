@@ -301,6 +301,8 @@ export default function AdminPage({ onExit }) {
                 onChange={(v) => set('booth.autoReturnSeconds', v)} min={0} max={60} />
               <NumberField label="Preview Time Before Auto-Print (sec, 0 = instant)" value={config.booth?.previewBeforePrintSeconds ?? 5}
                 onChange={(v) => set('booth.previewBeforePrintSeconds', v)} min={0} max={30} />
+              <NumberField label="Camera View Dim Overlay (%, 0 = off)" value={config.booth?.liveOverlayOpacity ?? 35}
+                onChange={(v) => set('booth.liveOverlayOpacity', v)} min={0} max={100} />
             </section>
 
             {/* Admin PIN */}
