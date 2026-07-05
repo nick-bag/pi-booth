@@ -95,7 +95,9 @@ async function buildCollageStrip(imagePaths) {
     })
   );
 
-  const outputPath = path.join(PHOTOS_DIR, `collage_${Date.now()}.jpg`);
+  // Encode the actual photo count in the filename so printFile() always knows exactly how
+  // many photos are in this strip, even if the admin's collage.shots setting changes later.
+  const outputPath = path.join(PHOTOS_DIR, `collage_n${n}_${Date.now()}.jpg`);
   await sharp({
     create: { width: STRIP_W, height: STRIP_H, channels: 3, background: backgroundColor },
   })
@@ -172,7 +174,11 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
     // Reflow (not stretch) each individual photo into the new content box: re-crop each photo
     // with 'cover' so aspect ratio is preserved (a subtle uniform zoom/crop instead of distortion),
     // rather than resizing the whole composited block, which would squish photos unevenly/unnaturally.
-    const n = config.collage?.shots ?? 3;
+    // Prefer the count baked into the filename (collage_nN_...) — this is the count actually
+    // used at build time, which may differ from the CURRENT admin setting if it was changed
+    // in between. Falling back to config.collage.shots only for older files without this tag.
+    const filenameMatch = path.basename(filepath).match(/collage_n(\d+)_/);
+    const n = filenameMatch ? parseInt(filenameMatch[1], 10) : (config.collage?.shots ?? 3);
     const oldThumbW = stripW - 2 * border;
     const oldThumbH = Math.floor((stripH - border * (n + 1)) / n);
     const newThumbH = Math.floor((contentH - border * (n - 1)) / n);
