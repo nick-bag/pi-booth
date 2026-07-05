@@ -36,8 +36,8 @@ html, body, #root {
   position: absolute;
   top: env(safe-area-inset-top);
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: calc(100% - env(safe-area-inset-top));
   object-fit: cover;
   transform: scaleX(-1);
   opacity: 0;
