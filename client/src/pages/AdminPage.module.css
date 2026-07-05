@@ -10,7 +10,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.5rem;
+  /* Push below the iPad's status bar (time/wifi/battery) when the PWA is fullscreen but the
+     status bar is still visible (e.g. no Guided Access). Falls back to the normal 1rem
+     otherwise. Requires viewport-fit=cover in index.html for env(safe-area-inset-top) to work. */
+  padding: max(1rem, env(safe-area-inset-top)) 1.5rem 1rem;
   border-bottom: 1px solid var(--surface2);
   flex-shrink: 0;
 }
@@ -114,7 +117,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 1rem 1.5rem;
+  padding: 1rem 1.5rem calc(1rem + env(safe-area-inset-bottom));
   background: var(--surface);
   border-top: 1px solid var(--surface2);
   display: flex;
