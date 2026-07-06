@@ -87,7 +87,7 @@ export default function App() {
         autoPlay
         playsInline
         muted
-        className={`appVideo${camReady ? ' appVideoReady' : ''}`}
+        className={`appVideo${camReady ? ' appVideoReady' : ''}${config?.booth?.matchDslrAspect ? ' appVideoAspect' : ''}`}
       />
       <div className="appContent">
         {pageContent}

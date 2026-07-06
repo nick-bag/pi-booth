@@ -307,6 +307,9 @@ export default function AdminPage({ onExit }) {
               <NumberField label="Camera View Dim Overlay (%, 0 = off)" value={config.booth?.liveOverlayOpacity ?? 35}
                 onChange={(v) => set('booth.liveOverlayOpacity', v)} min={0} max={100} />
               <p className={styles.fieldHint}>Applies to the idle start screen and the countdown/capture screens.</p>
+              <Toggle label="Match DSLR Aspect Ratio (test)" value={config.booth?.matchDslrAspect ?? false}
+                onChange={(v) => set('booth.matchDslrAspect', v)} />
+              <p className={styles.fieldHint}>Crops the iPad's live preview to a 2:3 portrait box (matching the DSLR photo) instead of filling the whole screen, so guests frame themselves closer to what the camera will actually capture.</p>
             </section>
 
             {/* Admin PIN */}

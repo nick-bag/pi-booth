@@ -45,7 +45,8 @@
   "booth": {
     "autoReturnSeconds": 10,
     "previewBeforePrintSeconds": 5,
-    "liveOverlayOpacity": 35
+    "liveOverlayOpacity": 35,
+    "matchDslrAspect": false
   },
   "template": {
     "enabled": true,
