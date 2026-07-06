@@ -149,7 +149,7 @@ Access everything at `http://<pi-ip>` (no port number needed).
 | Key | Description |
 |-----|-------------|
 | `camera.simulateCapture` | Use a placeholder image instead of triggering gPhoto2 |
-| `camera.shutterDelayMs` | Pause after the on-screen countdown hits 0, before the shutter actually fires — compensates for camera shutter lag |
+| `camera.shutterDelayMs` | Fires the capture request this many ms *before* the on-screen countdown hits 0 — compensates for camera/USB shutter lag so the shot lands right on "0" |
 | `print.enabled` | Auto-print after every capture |
 | `print.printer` | CUPS printer name (`lpstat -p` to list) |
 | `print.singlePrintCopies` | Copies for single photos |

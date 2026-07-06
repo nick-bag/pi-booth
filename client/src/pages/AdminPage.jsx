@@ -277,7 +277,7 @@ export default function AdminPage({ onExit }) {
                 onChange={(v) => set('collage.shots', v)} min={2} max={6} />
               <NumberField label="Shutter Delay (ms)" value={config.camera?.shutterDelayMs ?? 0}
                 onChange={(v) => set('camera.shutterDelayMs', v)} min={0} max={2000} step={50} />
-              <p className={styles.fieldHint}>Extra pause after the countdown hits 0, before the camera actually fires — compensates for shutter lag so the shot lands on the pose, not a beat late.</p>
+              <p className={styles.fieldHint}>Fires the capture request this many ms before the on-screen countdown hits 0 — compensates for shutter lag so the shot lands right on "0" instead of a beat late.</p>
             </section>
 
             {/* Template */}

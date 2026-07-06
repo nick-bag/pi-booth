@@ -97,12 +97,8 @@ async function capturePhoto(filename) {
     }).jpeg().toFile(filepath);
     return filepath;
   }
-  // Compensates for the visual gap between the on-screen countdown hitting 0 and the
-  // camera's actual shutter firing (gphoto2/USB/shutter lag), so the shot lands at the
-  // moment guests are actually posing for, not a beat late.
-  const shutterDelayMs = config.camera?.shutterDelayMs ?? 0;
-  if (shutterDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, shutterDelayMs));
-
+  // Note: shutterDelayMs is applied client-side (fires this request early, ahead of the
+  // on-screen countdown reaching 0) rather than here — see CapturePage.jsx.
   await execAsync(`gphoto2 --capture-image-and-download --filename "${filepath}" --force-overwrite`);
   return filepath;
 }
@@ -383,6 +379,7 @@ app.get('/config', (req, res) => {
     single: config.single,
     gallery: config.gallery,
     booth: config.booth,
+    camera: { shutterDelayMs: config.camera?.shutterDelayMs ?? 0 },
     template: { enabled: config.template?.enabled ?? false },
     print: {
       enabled: config.print.enabled,
@@ -412,7 +409,7 @@ app.post('/capture/shot', async (req, res) => {
   try {
     const filename = `collage_shot_${Date.now()}.jpg`;
     const filepath = await capturePhoto(filename);
-    res.json({ success: true, filename, url: `/photos/${filename}` });
+    res.json({ success: true, filename, url: `/photos/${filename}`, thumbUrl: `/photos/thumb/${filename}` });
   } catch (err) {
     console.error('Shot capture error:', err);
     res.status(500).json({ success: false, error: err.message });
