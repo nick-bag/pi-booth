@@ -199,7 +199,7 @@ export default function AdminPage({ onExit }) {
           </div>
         ) : (
           <div className={styles.photoActions}>
-            <a className={styles.photoActionBtn} href={selectedPhoto.url} download={selectedPhoto.filename}>Download</a>
+            <a className={styles.photoActionBtn} href={selectedPhoto.downloadUrl ?? selectedPhoto.url}>Download</a>
             <button className={styles.photoActionBtn} onClick={() => setConfirmPrint(true)}>Print</button>
             <button className={`${styles.photoActionBtn} ${styles.photoActionDanger}`} onClick={() => setConfirmDelete(true)}>Delete</button>
           </div>

@@ -45,6 +45,13 @@ app.use(cors());
 app.use(express.json());
 app.use('/photos', express.static(PHOTOS_DIR));
 
+app.get('/photos/download/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filepath = path.join(PHOTOS_DIR, filename);
+  if (!existsSync(filepath)) return res.status(404).end();
+  res.download(filepath, filename);
+});
+
 // GET /photos/thumb/:filename - resized, cached thumbnail for gallery grids.
 // Full-resolution captures can be several MB each; serving those directly in a
 // grid of dozens of photos is what was causing slow gallery load times.
@@ -495,6 +502,7 @@ app.get('/gallery', async (req, res) => {
         filename: f,
         kind: classifyGalleryFile(f),
         url: `/photos/${f}`,
+        downloadUrl: `/photos/download/${encodeURIComponent(f)}`,
         thumbUrl: `/photos/thumb/${f}`,
       }));
     res.json({ photos });
