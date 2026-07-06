@@ -376,10 +376,19 @@ export default function AdminPage({ onExit }) {
                   {section.photos.length === 0 ? (
                     <div className={styles.galleryEmptySection}>{section.empty}</div>
                   ) : (
-                    <div className={styles.galleryGrid}>
+                    <div className={`${styles.galleryGrid} ${section.id === 'strip' ? styles.galleryGridStrips : ''}`}>
                       {section.photos.map((photo) => (
-                        <div key={photo.filename} className={styles.galleryThumb} onClick={() => setSelectedPhoto(photo)}>
-                          <img src={photo.thumbUrl ?? photo.url} alt={photo.filename} loading="lazy" />
+                        <div
+                          key={photo.filename}
+                          className={`${styles.galleryThumb} ${section.id === 'strip' ? styles.galleryThumbStrip : ''}`}
+                          onClick={() => setSelectedPhoto(photo)}
+                        >
+                          <img
+                            src={photo.thumbUrl ?? photo.url}
+                            alt={photo.filename}
+                            loading="lazy"
+                            className={section.id === 'strip' ? styles.galleryThumbImgStrip : ''}
+                          />
                         </div>
                       ))}
                     </div>
