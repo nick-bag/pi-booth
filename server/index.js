@@ -116,7 +116,10 @@ async function buildCollageStrip(imagePaths) {
 
   const composites = await Promise.all(
     imagePaths.map(async (imgPath, i) => {
-      const resized = await sharp(imgPath)
+      // Apply the same EXIF-aware orientation correction used for single photos — without
+      // this, shots from a portrait-mounted camera would be resized/cropped while sideways.
+      const { pipeline } = await toPortrait(imgPath);
+      const resized = await pipeline
         .resize(THUMB_W, THUMB_H, { fit: 'cover' })
         .toBuffer();
       return { input: resized, top: border + i * (THUMB_H + border), left: border };
@@ -147,11 +150,27 @@ const TRIM_RIGHT = 20;
 const TRIM_TOP = 5;
 const TRIM_BOTTOM = 40;
 
-// Rotate landscape captures (e.g. the simulated camera's 1800x1200 placeholder) to portrait
-// so downstream border/trim math — measured against a portrait 4x6 page — applies correctly.
+// Rotate landscape captures to portrait so downstream border/trim math — measured against a
+// portrait 4x6 page — applies correctly. Real camera files carry an EXIF orientation tag set
+// by the camera's own orientation sensor, which correctly reflects how it's physically mounted
+// (landscape or portrait) — so that tag is trusted via sharp's auto-orient rotate() when present.
+// Only falls back to the old "rotate 90 if landscape" heuristic for sources with no EXIF
+// orientation data at all (e.g. the simulated capture placeholder).
 // Returns a sharp pipeline plus the resulting (already-portrait) width/height.
 async function toPortrait(filepath) {
   const meta = await sharp(filepath).metadata();
+  const orientation = meta.orientation ?? 1;
+
+  if (orientation !== 1) {
+    // EXIF orientations 5-8 mean width/height are swapped once rotated for display.
+    const swapped = orientation >= 5 && orientation <= 8;
+    return {
+      pipeline: sharp(filepath).rotate(),
+      width: swapped ? meta.height : meta.width,
+      height: swapped ? meta.width : meta.height,
+    };
+  }
+
   const needsRotate = meta.width > meta.height;
   const pipeline = needsRotate ? sharp(filepath).rotate(90) : sharp(filepath);
   const width = needsRotate ? meta.height : meta.width;
