@@ -56,7 +56,12 @@ app.get('/photos/thumb/:filename', async (req, res) => {
 
     const thumbPath = path.join(THUMBS_DIR, `${filename}.jpg`);
     if (!existsSync(thumbPath)) {
+      // .rotate() (no args) bakes in the source's EXIF orientation before resizing — without
+      // it, sharp strips EXIF metadata from the thumbnail output by default, so a raw camera
+      // shot with an orientation tag (rather than physically rotated pixels) would end up
+      // sideways in the thumbnail even though the original file displays correctly.
       await sharp(srcPath)
+        .rotate()
         .resize({ width: 400, withoutEnlargement: true })
         .jpeg({ quality: 70 })
         .toFile(thumbPath);
