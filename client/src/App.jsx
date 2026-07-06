@@ -10,7 +10,6 @@ export default function App() {
   const [view, setView] = useState(VIEWS.START);
   const [captureType, setCaptureType] = useState(null);
   const [config, setConfig] = useState(null);
-  const [wsEvent, setWsEvent] = useState(null);
   const tapCount = useRef(0);
   const tapTimer = useRef(null);
 
@@ -34,9 +33,7 @@ export default function App() {
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
-
   usePhotobooth((event) => {
-    setWsEvent(event);
     if (event.event === 'config_updated') {
       apiConfig().then(setConfig).catch(console.error);
     }
@@ -72,7 +69,6 @@ export default function App() {
   function handleBack() {
     setView(VIEWS.START);
     setCaptureType(null);
-    setWsEvent(null);
   }
 
   let pageContent;

@@ -442,7 +442,7 @@ app.post('/capture/single', async (req, res) => {
   try {
     const filename = `photo_${Date.now()}.jpg`;
     broadcast({ event: 'capturing' });
-    const filepath = await capturePhoto(filename);
+    await capturePhoto(filename);
     broadcast({ event: 'captured', filename });
     res.json({ success: true, filename, url: `/photos/${filename}` });
   } catch (err) {
@@ -456,7 +456,7 @@ app.post('/capture/single', async (req, res) => {
 app.post('/capture/shot', async (req, res) => {
   try {
     const filename = `collage_shot_${Date.now()}.jpg`;
-    const filepath = await capturePhoto(filename);
+    await capturePhoto(filename);
     res.json({ success: true, filename, url: `/photos/${filename}`, thumbUrl: `/photos/thumb/${filename}` });
   } catch (err) {
     console.error('Shot capture error:', err);

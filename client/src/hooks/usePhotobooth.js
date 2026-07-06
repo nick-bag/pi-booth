@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 const WS_URL = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
 
@@ -55,12 +55,6 @@ export async function apiPrint(filename, type, withTemplate = false) {
     body: JSON.stringify({ filename, type, withTemplate }),
   });
   if (!res.ok) throw new Error('Print failed');
-  return res.json();
-}
-
-export async function apiGallery() {
-  const res = await fetch('/api/gallery');
-  if (!res.ok) throw new Error('Gallery failed');
   return res.json();
 }
 
