@@ -206,7 +206,7 @@ export default function CapturePage({ type, config, camReady, onBack }) {
   if (phase === PHASES.PREVIEW && result) {
     return (
       <div className={styles.preview}>
-        <img src={result.url} alt="Your photo" className={styles.previewImg} />
+        <img src={result.previewUrl ?? result.url} alt="Your photo" className={styles.previewImg} />
         <div className={styles.previewActions}>
           <BigButton onClick={onBack} variant="secondary">Start Over</BigButton>
           {printCountdown !== null && (

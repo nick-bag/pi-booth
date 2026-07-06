@@ -33,9 +33,11 @@ let config = require('./config.json');
 const execAsync = promisify(exec);
 const PHOTOS_DIR = path.join(__dirname, '../data/photos');
 const THUMBS_DIR = path.join(PHOTOS_DIR, '.thumbs');
+const PREVIEWS_DIR = path.join(PHOTOS_DIR, '.previews');
 
 if (!existsSync(PHOTOS_DIR)) mkdirSync(PHOTOS_DIR, { recursive: true });
 if (!existsSync(THUMBS_DIR)) mkdirSync(THUMBS_DIR, { recursive: true });
+if (!existsSync(PREVIEWS_DIR)) mkdirSync(PREVIEWS_DIR, { recursive: true });
 
 const app = express();
 const server = createServer(httpsOptions, app);
@@ -81,6 +83,31 @@ app.get('/photos/thumb/:filename', async (req, res) => {
   }
 });
 
+// GET /photos/preview/:filename - cached display-sized preview for post-capture review.
+// DSLR originals are much larger than the iPad needs for a full-screen preview, which was
+// making the just-captured photo appear to load progressively in visible chunks.
+app.get('/photos/preview/:filename', async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    const srcPath = path.join(PHOTOS_DIR, filename);
+    if (!existsSync(srcPath)) return res.status(404).end();
+
+    const previewPath = path.join(PREVIEWS_DIR, `${filename}.jpg`);
+    if (!existsSync(previewPath)) {
+      await sharp(srcPath)
+        .rotate()
+        .resize({ width: 1400, height: 1800, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 82 })
+        .toFile(previewPath);
+    }
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    res.sendFile(previewPath);
+  } catch (err) {
+    console.error('Preview error:', err);
+    res.status(500).end();
+  }
+});
+
 // Strip /api prefix — Vite proxy does this in dev, we do it here in production
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {
@@ -108,6 +135,7 @@ function buildGalleryPhoto(filename) {
     filename,
     kind: classifyGalleryFile(filename),
     url: `/photos/${filename}`,
+    previewUrl: `/photos/preview/${encodeURIComponent(filename)}`,
     downloadUrl: `/photos/download/${encodeURIComponent(filename)}`,
     thumbUrl: `/photos/thumb/${filename}`,
   };
@@ -444,7 +472,7 @@ app.post('/capture/single', async (req, res) => {
     broadcast({ event: 'capturing' });
     await capturePhoto(filename);
     broadcast({ event: 'captured', filename });
-    res.json({ success: true, filename, url: `/photos/${filename}` });
+    res.json({ success: true, filename, url: `/photos/${filename}`, previewUrl: `/photos/preview/${filename}` });
   } catch (err) {
     console.error('Capture error:', err);
     broadcast({ event: 'error', message: 'Capture failed' });
@@ -474,7 +502,7 @@ app.post('/collage/build', async (req, res) => {
     broadcast({ event: 'building_collage' });
     const collageFile = await buildCollageStrip(imagePaths);
     const collageFilename = path.basename(collageFile);
-    res.json({ success: true, filename: collageFilename, url: `/photos/${collageFilename}` });
+    res.json({ success: true, filename: collageFilename, url: `/photos/${collageFilename}`, previewUrl: `/photos/preview/${collageFilename}` });
   } catch (err) {
     console.error('Collage build error:', err);
     res.status(500).json({ success: false, error: err.message });
