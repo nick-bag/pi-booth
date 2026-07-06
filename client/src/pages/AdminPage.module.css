@@ -324,6 +324,18 @@
   font-size: 1.05rem;
 }
 
+.galleryLoadSentinel {
+  height: 1px;
+}
+
+.galleryLoadingMore {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0 0.5rem;
+  color: rgba(255,255,255,0.45);
+  font-size: 0.95rem;
+}
+
 .fullscreen {
   position: fixed;
   inset: 0;

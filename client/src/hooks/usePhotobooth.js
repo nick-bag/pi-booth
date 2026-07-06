@@ -64,6 +64,23 @@ export async function apiGallery() {
   return res.json();
 }
 
+export async function apiGallerySummary() {
+  const res = await fetch('/api/gallery/summary');
+  if (!res.ok) throw new Error('Gallery summary failed');
+  return res.json();
+}
+
+export async function apiGallerySection(kind, { offset = 0, limit = 60 } = {}) {
+  const params = new URLSearchParams({
+    kind,
+    offset: String(offset),
+    limit: String(limit),
+  });
+  const res = await fetch(`/api/gallery?${params.toString()}`);
+  if (!res.ok) throw new Error('Gallery section failed');
+  return res.json();
+}
+
 export async function apiConfig() {
   const res = await fetch('/api/config');
   if (!res.ok) throw new Error('Config failed');

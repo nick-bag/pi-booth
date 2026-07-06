@@ -103,6 +103,16 @@ function classifyGalleryFile(filename) {
   return 'other';
 }
 
+function buildGalleryPhoto(filename) {
+  return {
+    filename,
+    kind: classifyGalleryFile(filename),
+    url: `/photos/${filename}`,
+    downloadUrl: `/photos/download/${encodeURIComponent(filename)}`,
+    thumbUrl: `/photos/thumb/${filename}`,
+  };
+}
+
 // Capture a single photo via gphoto2
 async function capturePhoto(filename) {
   const filepath = path.join(PHOTOS_DIR, filename);
@@ -490,22 +500,49 @@ app.post('/print', async (req, res) => {
   }
 });
 
-// GET /gallery - list all photos
-app.get('/gallery', async (req, res) => {
+app.get('/gallery/summary', async (req, res) => {
   try {
     const files = await readdir(PHOTOS_DIR);
-    const photos = files
+    const counts = files
       .filter((f) => f.match(/\.(jpg|jpeg|png)$/i))
+      .reduce((acc, filename) => {
+        const kind = classifyGalleryFile(filename);
+        if (kind !== 'other') acc[kind] = (acc[kind] ?? 0) + 1;
+        return acc;
+      }, { single: 0, 'strip-shot': 0, strip: 0 });
+    res.json({ counts });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /gallery - list one gallery section at a time with pagination
+app.get('/gallery', async (req, res) => {
+  try {
+    const requestedKind = String(req.query.kind ?? '');
+    if (!['single', 'strip-shot', 'strip'].includes(requestedKind)) {
+      return res.status(400).json({ error: 'valid kind query required' });
+    }
+
+    const offset = Math.max(0, Number.parseInt(String(req.query.offset ?? '0'), 10) || 0);
+    const limit = Math.min(200, Math.max(1, Number.parseInt(String(req.query.limit ?? '60'), 10) || 60));
+
+    const filtered = (await readdir(PHOTOS_DIR))
+      .filter((f) => f.match(/\.(jpg|jpeg|png)$/i) && classifyGalleryFile(f) === requestedKind)
       .sort()
-      .reverse()
-      .map((f) => ({
-        filename: f,
-        kind: classifyGalleryFile(f),
-        url: `/photos/${f}`,
-        downloadUrl: `/photos/download/${encodeURIComponent(f)}`,
-        thumbUrl: `/photos/thumb/${f}`,
-      }));
-    res.json({ photos });
+      .reverse();
+
+    const photos = filtered
+      .slice(offset, offset + limit)
+      .map(buildGalleryPhoto);
+
+    res.json({
+      photos,
+      total: filtered.length,
+      offset,
+      limit,
+      hasMore: offset + photos.length < filtered.length,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

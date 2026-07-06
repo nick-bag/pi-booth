@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { apiGallery } from '../hooks/usePhotobooth.js';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { apiGallerySection, apiGallerySummary } from '../hooks/usePhotobooth.js';
 import styles from './AdminPage.module.css';
 
 const API = (path) => `/api/admin${path}`;
+const GALLERY_PAGE_SIZE = 60;
 const GALLERY_SECTIONS = [
   { id: 'single', title: 'Single Shots', empty: 'No single shots yet' },
   { id: 'strip-shot', title: 'Photo Strip Shots', empty: 'No photo strip shots yet' },
@@ -20,13 +21,17 @@ export default function AdminPage({ onExit }) {
   const [error, setError] = useState('');
 
   // Gallery state
-  const [photos, setPhotos] = useState([]);
+  const [galleryCounts, setGalleryCounts] = useState({ single: 0, 'strip-shot': 0, strip: 0 });
+  const [galleryPhotos, setGalleryPhotos] = useState([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
+  const [galleryLoadingMore, setGalleryLoadingMore] = useState(false);
   const [galleryError, setGalleryError] = useState('');
   const [activeGallerySection, setActiveGallerySection] = useState(null);
+  const [galleryHasMore, setGalleryHasMore] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmPrint, setConfirmPrint] = useState(false);
+  const loadMoreRef = useRef(null);
 
   useEffect(() => {
     if (!unlocked) return;
@@ -43,8 +48,8 @@ export default function AdminPage({ onExit }) {
     if (!unlocked || tab !== 'gallery') return;
     setGalleryLoading(true);
     setGalleryError('');
-    apiGallery()
-      .then((data) => setPhotos(data.photos))
+    apiGallerySummary()
+      .then((data) => setGalleryCounts(data.counts))
       .catch((err) => {
         console.error('Failed to load gallery:', err);
         setGalleryError('Failed to load gallery');
@@ -53,8 +58,54 @@ export default function AdminPage({ onExit }) {
   }, [unlocked, tab]);
 
   useEffect(() => {
-    if (tab !== 'gallery') setActiveGallerySection(null);
+    if (tab !== 'gallery') {
+      setActiveGallerySection(null);
+      setGalleryPhotos([]);
+      setGalleryHasMore(false);
+    }
   }, [tab]);
+
+  const loadGallerySection = useCallback(async (sectionId, offset = 0) => {
+    const append = offset > 0;
+    if (append) setGalleryLoadingMore(true);
+    else setGalleryLoading(true);
+    setGalleryError('');
+    try {
+      const data = await apiGallerySection(sectionId, { offset, limit: GALLERY_PAGE_SIZE });
+      setGalleryPhotos((prev) => (append ? [...prev, ...data.photos] : data.photos));
+      setGalleryHasMore(data.hasMore);
+      setGalleryCounts((prev) => ({ ...prev, [sectionId]: data.total }));
+    } catch (err) {
+      console.error('Failed to load gallery section:', err);
+      setGalleryError('Failed to load gallery');
+    } finally {
+      if (append) setGalleryLoadingMore(false);
+      else setGalleryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!unlocked || tab !== 'gallery' || !activeGallerySection) return;
+    setGalleryPhotos([]);
+    setGalleryHasMore(false);
+    loadGallerySection(activeGallerySection, 0);
+  }, [unlocked, tab, activeGallerySection, loadGallerySection]);
+
+  const loadNextGalleryPage = useCallback(() => {
+    if (!activeGallerySection || galleryLoading || galleryLoadingMore || !galleryHasMore) return;
+    loadGallerySection(activeGallerySection, galleryPhotos.length);
+  }, [activeGallerySection, galleryLoading, galleryLoadingMore, galleryHasMore, galleryPhotos.length, loadGallerySection]);
+
+  useEffect(() => {
+    if (!activeGallerySection || !galleryHasMore || galleryLoading || galleryLoadingMore) return;
+    const node = loadMoreRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) loadNextGalleryPage();
+    }, { rootMargin: '200px 0px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [activeGallerySection, galleryHasMore, galleryLoading, galleryLoadingMore, loadNextGalleryPage]);
 
   function handleUnlock(e) {
     e.preventDefault();
@@ -138,11 +189,8 @@ export default function AdminPage({ onExit }) {
   if (!config) {
     return <div className={styles.loading}>Loading…</div>;
   }
-
-  const photoSections = GALLERY_SECTIONS.map((section) => ({
-    ...section,
-    photos: photos.filter((photo) => photo.kind === section.id),
-  }));
+  const activeSection = GALLERY_SECTIONS.find((section) => section.id === activeGallerySection) ?? null;
+  const totalGalleryItems = Object.values(galleryCounts).reduce((sum, count) => sum + count, 0);
 
   // Fullscreen photo view
   if (selectedPhoto) {
@@ -157,7 +205,11 @@ export default function AdminPage({ onExit }) {
         });
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
-        setPhotos((prev) => prev.filter((p) => p.filename !== selectedPhoto.filename));
+        setGalleryPhotos((prev) => prev.filter((p) => p.filename !== selectedPhoto.filename));
+        setGalleryCounts((prev) => ({
+          ...prev,
+          [selectedPhoto.kind]: Math.max(0, (prev[selectedPhoto.kind] ?? 0) - 1),
+        }));
         setSelectedPhoto(null);
         setConfirmDelete(false);
       } catch (e) {
@@ -354,51 +406,51 @@ export default function AdminPage({ onExit }) {
 
       {tab === 'gallery' && (
         <div className={styles.galleryWrap}>
-          {galleryLoading ? (
+          {galleryLoading && !activeSection ? (
             <div className={styles.galleryEmpty}>Loading…</div>
           ) : galleryError ? (
             <div className={styles.galleryEmpty}>{galleryError}</div>
-          ) : photos.length === 0 ? (
+          ) : totalGalleryItems === 0 && !activeSection ? (
             <div className={styles.galleryEmpty}>No photos yet</div>
-          ) : activeGallerySection ? (
-            (() => {
-              const section = photoSections.find((item) => item.id === activeGallerySection);
-              if (!section) return <div className={styles.galleryEmpty}>Unknown gallery section</div>;
-              return (
-                <div className={styles.gallerySectionView}>
-                  <div className={styles.gallerySectionHeader}>
-                    <button className={styles.btnSecondary} onClick={() => setActiveGallerySection(null)}>← Back to Folders</button>
-                    <div className={styles.gallerySectionMeta}>
-                      <h2 className={styles.gallerySectionTitle}>{section.title}</h2>
-                      <p className={styles.gallerySectionCount}>{section.photos.length} item{section.photos.length === 1 ? '' : 's'}</p>
-                    </div>
-                  </div>
-                  {section.photos.length === 0 ? (
-                    <div className={styles.galleryEmptySection}>{section.empty}</div>
-                  ) : (
-                    <div className={`${styles.galleryGrid} ${section.id === 'strip' ? styles.galleryGridStrips : ''}`}>
-                      {section.photos.map((photo) => (
-                        <div
-                          key={photo.filename}
-                          className={`${styles.galleryThumb} ${section.id === 'strip' ? styles.galleryThumbStrip : ''}`}
-                          onClick={() => setSelectedPhoto(photo)}
-                        >
-                          <img
-                            src={photo.thumbUrl ?? photo.url}
-                            alt={photo.filename}
-                            loading="lazy"
-                            className={section.id === 'strip' ? styles.galleryThumbImgStrip : ''}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
+          ) : activeSection ? (
+            <div className={styles.gallerySectionView}>
+              <div className={styles.gallerySectionHeader}>
+                <button className={styles.btnSecondary} onClick={() => setActiveGallerySection(null)}>← Back to Folders</button>
+                <div className={styles.gallerySectionMeta}>
+                  <h2 className={styles.gallerySectionTitle}>{activeSection.title}</h2>
+                  <p className={styles.gallerySectionCount}>{galleryCounts[activeSection.id] ?? 0} item{(galleryCounts[activeSection.id] ?? 0) === 1 ? '' : 's'}</p>
                 </div>
-              );
-            })()
+              </div>
+              {galleryLoading && galleryPhotos.length === 0 ? (
+                <div className={styles.galleryEmptySection}>Loading…</div>
+              ) : galleryPhotos.length === 0 ? (
+                <div className={styles.galleryEmptySection}>{activeSection.empty}</div>
+              ) : (
+                <>
+                  <div className={`${styles.galleryGrid} ${activeSection.id === 'strip' ? styles.galleryGridStrips : ''}`}>
+                    {galleryPhotos.map((photo) => (
+                      <div
+                        key={photo.filename}
+                        className={`${styles.galleryThumb} ${activeSection.id === 'strip' ? styles.galleryThumbStrip : ''}`}
+                        onClick={() => setSelectedPhoto(photo)}
+                      >
+                        <img
+                          src={photo.thumbUrl ?? photo.url}
+                          alt={photo.filename}
+                          loading="lazy"
+                          className={activeSection.id === 'strip' ? styles.galleryThumbImgStrip : ''}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {galleryHasMore && <div ref={loadMoreRef} className={styles.galleryLoadSentinel} />}
+                  {galleryLoadingMore && <div className={styles.galleryLoadingMore}>Loading more…</div>}
+                </>
+              )}
+            </div>
           ) : (
             <div className={styles.galleryFolders}>
-              {photoSections.map((section) => (
+              {GALLERY_SECTIONS.map((section) => (
                 <button
                   key={section.id}
                   className={styles.galleryFolder}
@@ -406,7 +458,7 @@ export default function AdminPage({ onExit }) {
                 >
                   <div className={styles.galleryFolderTitleRow}>
                     <span className={styles.galleryFolderIcon}>Folder</span>
-                    <span className={styles.galleryFolderCount}>{section.photos.length}</span>
+                    <span className={styles.galleryFolderCount}>{galleryCounts[section.id] ?? 0}</span>
                   </div>
                   <div className={styles.galleryFolderTitle}>{section.title}</div>
                   <div className={styles.galleryFolderHint}>{section.empty.replace('No ', '').replace(' yet', '')}</div>
