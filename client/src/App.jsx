@@ -80,20 +80,29 @@ export default function App() {
   else if (view === VIEWS.CAPTURE && captureType) pageContent = <CapturePage type={captureType} config={config} camReady={camReady} onBack={handleBack} />;
   else pageContent = <StartPage config={config} onSelect={handleSelect} onTitleTap={handleTitleTap} />;
 
+  const previewZoom = Math.max(config?.booth?.livePreviewZoomPercent ?? 100, 1) / 100;
+
   return (
     <div className="appRoot">
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
+      <div
         className={[
-          'appVideo',
-          camReady && 'appVideoReady',
-          config?.booth?.matchDslrAspect && 'appVideoAspect',
-          (config?.booth?.mirrorLivePreview ?? true) && 'appVideoMirrored',
+          'appVideoFrame',
+          config?.booth?.matchDslrAspect && 'appVideoFrameAspect',
         ].filter(Boolean).join(' ')}
-      />
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={[
+            'appVideo',
+            camReady && 'appVideoReady',
+            (config?.booth?.mirrorLivePreview ?? true) && 'appVideoMirrored',
+          ].filter(Boolean).join(' ')}
+          style={{ '--app-video-scale': previewZoom }}
+        />
+      </div>
       <div className="appContent">
         {pageContent}
       </div>

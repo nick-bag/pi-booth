@@ -307,6 +307,9 @@ export default function AdminPage({ onExit }) {
               <NumberField label="Camera View Dim Overlay (%, 0 = off)" value={config.booth?.liveOverlayOpacity ?? 35}
                 onChange={(v) => set('booth.liveOverlayOpacity', v)} min={0} max={100} />
               <p className={styles.fieldHint}>Applies to the idle start screen and the countdown/capture screens.</p>
+              <NumberField label="Live Preview Zoom (%)" value={config.booth?.livePreviewZoomPercent ?? 100}
+                onChange={(v) => set('booth.livePreviewZoomPercent', v)} min={50} max={200} step={1} />
+              <p className={styles.fieldHint}>Digital zoom for the iPad preview only. Increase it to make the live framing closer to the DSLR shot without affecting the actual photo file.</p>
               <Toggle label="Mirror Live Preview" value={config.booth?.mirrorLivePreview ?? true}
                 onChange={(v) => set('booth.mirrorLivePreview', v)} />
               <p className={styles.fieldHint}>When on, the iPad preview behaves like a selfie mirror. Turn it off to match the DSLR photo's left/right orientation more closely.</p>

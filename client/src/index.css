@@ -32,19 +32,28 @@ html, body, #root {
   overflow: hidden;
 }
 
-.appVideo {
+.appVideoFrame {
   position: absolute;
   top: env(safe-area-inset-top);
   left: 0;
   width: 100%;
   height: calc(100% - env(safe-area-inset-top));
+  overflow: hidden;
+}
+
+.appVideo {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
+  --app-video-flip: 1;
+  transform: scaleX(var(--app-video-flip)) scale(var(--app-video-scale, 1));
+  transform-origin: center center;
   opacity: 0;
   transition: opacity 0.6s ease;
 }
 
 .appVideoMirrored {
-  transform: scaleX(-1);
+  --app-video-flip: -1;
 }
 
 .appVideoReady {
@@ -55,16 +64,12 @@ html, body, #root {
    (matching the DSLR's final photo) instead of filling the whole screen, so guests
    frame themselves closer to what the camera will actually capture. Anything outside
    the box falls back to the app's background color, acting as a visual letterbox. */
-.appVideoAspect {
+.appVideoFrameAspect {
   left: 50%;
   width: auto;
   height: calc(100% - env(safe-area-inset-top));
   aspect-ratio: 2 / 3;
   transform: translateX(-50%);
-}
-
-.appVideoAspect.appVideoMirrored {
-  transform: translateX(-50%) scaleX(-1);
 }
 
 .appContent {
