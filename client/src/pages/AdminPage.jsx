@@ -3,6 +3,11 @@ import { apiGallery } from '../hooks/usePhotobooth.js';
 import styles from './AdminPage.module.css';
 
 const API = (path) => `/api/admin${path}`;
+const GALLERY_SECTIONS = [
+  { id: 'single', title: 'Single Shots', empty: 'No single shots yet' },
+  { id: 'strip-shot', title: 'Photo Strip Shots', empty: 'No photo strip shots yet' },
+  { id: 'strip', title: 'Photo Strips', empty: 'No photo strips yet' },
+];
 
 export default function AdminPage({ onExit }) {
   const [pin, setPin] = useState('');
@@ -18,6 +23,7 @@ export default function AdminPage({ onExit }) {
   const [photos, setPhotos] = useState([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const [galleryError, setGalleryError] = useState('');
+  const [activeGallerySection, setActiveGallerySection] = useState(null);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmPrint, setConfirmPrint] = useState(false);
@@ -45,6 +51,10 @@ export default function AdminPage({ onExit }) {
       })
       .finally(() => setGalleryLoading(false));
   }, [unlocked, tab]);
+
+  useEffect(() => {
+    if (tab !== 'gallery') setActiveGallerySection(null);
+  }, [tab]);
 
   function handleUnlock(e) {
     e.preventDefault();
@@ -129,9 +139,14 @@ export default function AdminPage({ onExit }) {
     return <div className={styles.loading}>Loading…</div>;
   }
 
+  const photoSections = GALLERY_SECTIONS.map((section) => ({
+    ...section,
+    photos: photos.filter((photo) => photo.kind === section.id),
+  }));
+
   // Fullscreen photo view
   if (selectedPhoto) {
-    const isCollage = selectedPhoto.filename.startsWith('collage_');
+    const isCollage = selectedPhoto.kind === 'strip';
 
     async function handleDelete() {
       try {
@@ -345,12 +360,48 @@ export default function AdminPage({ onExit }) {
             <div className={styles.galleryEmpty}>{galleryError}</div>
           ) : photos.length === 0 ? (
             <div className={styles.galleryEmpty}>No photos yet</div>
-          ) : (
-            <div className={styles.galleryGrid}>
-              {photos.map((photo) => (
-                <div key={photo.filename} className={styles.galleryThumb} onClick={() => setSelectedPhoto(photo)}>
-                  <img src={photo.thumbUrl ?? photo.url} alt={photo.filename} loading="lazy" />
+          ) : activeGallerySection ? (
+            (() => {
+              const section = photoSections.find((item) => item.id === activeGallerySection);
+              if (!section) return <div className={styles.galleryEmpty}>Unknown gallery section</div>;
+              return (
+                <div className={styles.gallerySectionView}>
+                  <div className={styles.gallerySectionHeader}>
+                    <button className={styles.btnSecondary} onClick={() => setActiveGallerySection(null)}>← Back to Folders</button>
+                    <div className={styles.gallerySectionMeta}>
+                      <h2 className={styles.gallerySectionTitle}>{section.title}</h2>
+                      <p className={styles.gallerySectionCount}>{section.photos.length} item{section.photos.length === 1 ? '' : 's'}</p>
+                    </div>
+                  </div>
+                  {section.photos.length === 0 ? (
+                    <div className={styles.galleryEmptySection}>{section.empty}</div>
+                  ) : (
+                    <div className={styles.galleryGrid}>
+                      {section.photos.map((photo) => (
+                        <div key={photo.filename} className={styles.galleryThumb} onClick={() => setSelectedPhoto(photo)}>
+                          <img src={photo.thumbUrl ?? photo.url} alt={photo.filename} loading="lazy" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+              );
+            })()
+          ) : (
+            <div className={styles.galleryFolders}>
+              {photoSections.map((section) => (
+                <button
+                  key={section.id}
+                  className={styles.galleryFolder}
+                  onClick={() => setActiveGallerySection(section.id)}
+                >
+                  <div className={styles.galleryFolderTitleRow}>
+                    <span className={styles.galleryFolderIcon}>Folder</span>
+                    <span className={styles.galleryFolderCount}>{section.photos.length}</span>
+                  </div>
+                  <div className={styles.galleryFolderTitle}>{section.title}</div>
+                  <div className={styles.galleryFolderHint}>{section.empty.replace('No ', '').replace(' yet', '')}</div>
+                </button>
               ))}
             </div>
           )}

@@ -89,6 +89,13 @@ function broadcast(data) {
   });
 }
 
+function classifyGalleryFile(filename) {
+  if (filename.startsWith('photo_')) return 'single';
+  if (filename.startsWith('collage_shot_')) return 'strip-shot';
+  if (filename.startsWith('collage_')) return 'strip';
+  return 'other';
+}
+
 // Capture a single photo via gphoto2
 async function capturePhoto(filename) {
   const filepath = path.join(PHOTOS_DIR, filename);
@@ -484,7 +491,12 @@ app.get('/gallery', async (req, res) => {
       .filter((f) => f.match(/\.(jpg|jpeg|png)$/i))
       .sort()
       .reverse()
-      .map((f) => ({ filename: f, url: `/photos/${f}`, thumbUrl: `/photos/thumb/${f}` }));
+      .map((f) => ({
+        filename: f,
+        kind: classifyGalleryFile(f),
+        url: `/photos/${f}`,
+        thumbUrl: `/photos/thumb/${f}`,
+      }));
     res.json({ photos });
   } catch (err) {
     res.status(500).json({ error: err.message });
