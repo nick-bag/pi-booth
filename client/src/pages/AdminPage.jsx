@@ -275,6 +275,9 @@ export default function AdminPage({ onExit }) {
                 onChange={(v) => set('collage.shotPreviewSeconds', v)} min={1} max={10} />
               <NumberField label="Photos Per Strip" value={config.collage.shots ?? 3}
                 onChange={(v) => set('collage.shots', v)} min={2} max={6} />
+              <NumberField label="Shutter Delay (ms)" value={config.camera?.shutterDelayMs ?? 0}
+                onChange={(v) => set('camera.shutterDelayMs', v)} min={0} max={2000} step={50} />
+              <p className={styles.fieldHint}>Extra pause after the countdown hits 0, before the camera actually fires — compensates for shutter lag so the shot lands on the pose, not a beat late.</p>
             </section>
 
             {/* Template */}

@@ -97,6 +97,12 @@ async function capturePhoto(filename) {
     }).jpeg().toFile(filepath);
     return filepath;
   }
+  // Compensates for the visual gap between the on-screen countdown hitting 0 and the
+  // camera's actual shutter firing (gphoto2/USB/shutter lag), so the shot lands at the
+  // moment guests are actually posing for, not a beat late.
+  const shutterDelayMs = config.camera?.shutterDelayMs ?? 0;
+  if (shutterDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, shutterDelayMs));
+
   await execAsync(`gphoto2 --capture-image-and-download --filename "${filepath}" --force-overwrite`);
   return filepath;
 }

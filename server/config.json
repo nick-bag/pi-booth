@@ -11,7 +11,8 @@
       "--capture-image-and-download",
       "--filename"
     ],
-    "simulateCapture": true
+    "simulateCapture": true,
+    "shutterDelayMs": 0
   },
   "print": {
     "enabled": false,
