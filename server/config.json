@@ -46,6 +46,7 @@
     "autoReturnSeconds": 10,
     "previewBeforePrintSeconds": 5,
     "liveOverlayOpacity": 35,
+    "mirrorLivePreview": true,
     "matchDslrAspect": false
   },
   "template": {

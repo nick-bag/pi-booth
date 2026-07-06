@@ -87,7 +87,12 @@ export default function App() {
         autoPlay
         playsInline
         muted
-        className={`appVideo${camReady ? ' appVideoReady' : ''}${config?.booth?.matchDslrAspect ? ' appVideoAspect' : ''}`}
+        className={[
+          'appVideo',
+          camReady && 'appVideoReady',
+          config?.booth?.matchDslrAspect && 'appVideoAspect',
+          (config?.booth?.mirrorLivePreview ?? true) && 'appVideoMirrored',
+        ].filter(Boolean).join(' ')}
       />
       <div className="appContent">
         {pageContent}
