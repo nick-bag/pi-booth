@@ -269,6 +269,7 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
   const templateEnabled = withTemplate && config.template?.enabled;
   const stripTemplatePath = type === 'collage' ? getStripTemplateImagePath() : null;
   const stripTemplateActive = Boolean(templateEnabled && stripTemplatePath);
+  const stripBannerReserved = Boolean(templateEnabled && type === 'collage' && (stripTemplateActive || config.template?.text));
   const bannerTemplateActive = Boolean(templateEnabled && config.template?.text && !stripTemplateActive);
   const stripTemplateBuf = stripTemplateActive ? await sharp(stripTemplatePath).png().toBuffer() : null;
   const stripTemplatePlacement = getStripTemplatePlacement();
@@ -299,7 +300,7 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
     // The 4x6 sheet has a fixed physical height — the name banner (if any) shares that space
     // with the photos rather than extending past it. It sits directly below the photo content,
     // above the bottom border, and is identical on both resulting 2x6 strips.
-    const bannerH = bannerTemplateActive ? Math.round((config.template.bannerHeight ?? 100) * (stripW / 600)) : 0;
+    const bannerH = stripBannerReserved ? Math.round((config.template.bannerHeight ?? 100) * (stripW / 600)) : 0;
     const availableV = stripH - TRIM_TOP - TRIM_BOTTOM;
     const contentH = availableV - 2 * border - bannerH;
     const bannerTop = TRIM_TOP + border + contentH;
@@ -452,31 +453,7 @@ async function renderTemplatedCollageDownload(filepath) {
   const stripTemplateBuf = stripTemplatePath ? await sharp(stripTemplatePath).png().toBuffer() : null;
   const placement = getStripTemplatePlacement();
 
-  if (stripTemplateBuf) {
-    const nMatch = path.basename(filepath).match(/collage_n(\d+)_/);
-    const n = nMatch ? parseInt(nMatch[1], 10) : (config.collage?.shots ?? 3);
-    const thumbH = Math.floor((STRIP_TEMPLATE_H - border * (n + 1)) / n);
-    const thumbW = STRIP_TEMPLATE_W - 2 * border;
-    const composites = [];
-
-    for (let i = 0; i < n; i++) {
-      const photoBuf = await sharp(stripBuf)
-        .extract({ left: border, top: border + i * (thumbH + border), width: thumbW, height: thumbH })
-        .toBuffer();
-      composites.push({ input: photoBuf, left: border, top: border + i * (thumbH + border) });
-    }
-
-    return renderStripTemplateLayered({
-      width: STRIP_TEMPLATE_W,
-      height: STRIP_TEMPLATE_H,
-      backgroundColor,
-      contentComposites: composites,
-      stripTemplateBuf,
-      placement,
-    });
-  }
-
-  if (!config.template?.text) {
+  if (!stripTemplateBuf && !config.template?.text) {
     return sharp(stripBuf)
       .png()
       .toBuffer();
@@ -508,12 +485,18 @@ async function renderTemplatedCollageDownload(filepath) {
       .toBuffer();
     composites.push({ input: photoBuf, left: border, top: border + i * (newThumbH + border) });
   }
-  composites.push({ input: buildBannerSvg(contentW, bannerH), left: border, top: border + contentH });
+  if (!stripTemplateBuf && config.template?.text) {
+    composites.push({ input: buildBannerSvg(contentW, bannerH), left: border, top: border + contentH });
+  }
 
-  return sharp({ create: { width: STRIP_TEMPLATE_W, height: STRIP_TEMPLATE_H, channels: 3, background: backgroundColor } })
-    .composite(composites)
-    .png()
-    .toBuffer();
+  return renderStripTemplateLayered({
+    width: STRIP_TEMPLATE_W,
+    height: STRIP_TEMPLATE_H,
+    backgroundColor,
+    contentComposites: composites,
+    stripTemplateBuf,
+    placement,
+  });
 }
 
 async function renderTemplatedSingleDownload(filepath) {
