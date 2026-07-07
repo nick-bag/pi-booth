@@ -34,24 +34,50 @@ const execAsync = promisify(exec);
 const PHOTOS_DIR = path.join(__dirname, '../data/photos');
 const THUMBS_DIR = path.join(PHOTOS_DIR, '.thumbs');
 const PREVIEWS_DIR = path.join(PHOTOS_DIR, '.previews');
+const TEMPLATE_DIR = path.join(__dirname, '../data/templates');
+const STRIP_TEMPLATE_FILENAME = 'strip-template.png';
+const STRIP_TEMPLATE_W = 600;
+const STRIP_TEMPLATE_H = 1800;
 
 if (!existsSync(PHOTOS_DIR)) mkdirSync(PHOTOS_DIR, { recursive: true });
 if (!existsSync(THUMBS_DIR)) mkdirSync(THUMBS_DIR, { recursive: true });
 if (!existsSync(PREVIEWS_DIR)) mkdirSync(PREVIEWS_DIR, { recursive: true });
+if (!existsSync(TEMPLATE_DIR)) mkdirSync(TEMPLATE_DIR, { recursive: true });
 
 const app = express();
 const server = createServer(httpsOptions, app);
 const wss = new WebSocketServer({ server });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 app.use('/photos', express.static(PHOTOS_DIR));
+app.use('/template-images', express.static(TEMPLATE_DIR));
 
 app.get('/photos/download/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
   const filepath = path.join(PHOTOS_DIR, filename);
   if (!existsSync(filepath)) return res.status(404).end();
   res.download(filepath, filename);
+});
+
+app.get('/photos/download-rendered/:filename', async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    const filepath = path.join(PHOTOS_DIR, filename);
+    if (!existsSync(filepath)) return res.status(404).end();
+
+    const kind = classifyGalleryFile(filename);
+    const type = kind === 'strip' ? 'collage' : 'single';
+    const withTemplate = String(req.query.withTemplate ?? 'false') === 'true';
+    const rendered = await renderDownloadAsset(filepath, type, withTemplate);
+    const outputName = filename.replace(/\.[^.]+$/u, '') + (withTemplate ? '_with_template.png' : '.png');
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="${outputName}"`);
+    res.send(rendered);
+  } catch (err) {
+    console.error('Rendered download error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // GET /photos/thumb/:filename - resized, cached thumbnail for gallery grids.
@@ -240,7 +266,12 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
   let fileToPrint = filepath;
   let tmpPng = null;
 
-  const templateActive = withTemplate && config.template?.enabled && config.template?.text;
+  const templateEnabled = withTemplate && config.template?.enabled;
+  const stripTemplatePath = type === 'collage' ? getStripTemplateImagePath() : null;
+  const stripTemplateActive = Boolean(templateEnabled && stripTemplatePath);
+  const bannerTemplateActive = Boolean(templateEnabled && config.template?.text && !stripTemplateActive);
+  const stripTemplateBuf = stripTemplateActive ? await sharp(stripTemplatePath).png().toBuffer() : null;
+  const stripTemplatePlacement = getStripTemplatePlacement();
 
   if (type === 'collage') {
     // Place two copies of the strip side-by-side on a 4x6 canvas (1200x1800 at 300dpi).
@@ -251,8 +282,8 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
 
     // Must match buildCollageStrip()'s STRIP_W/STRIP_H exactly. Normalize (defensive) in case
     // a mismatched file is ever passed in, so the extract/composite math below can't crash.
-    const stripW = 600;
-    const stripH = 1800;
+    const stripW = STRIP_TEMPLATE_W;
+    const stripH = STRIP_TEMPLATE_H;
     const stripMeta = await sharp(filepath).metadata();
     const stripBuf = stripMeta.width === stripW && stripMeta.height === stripH
       ? await sharp(filepath).toBuffer()
@@ -268,7 +299,7 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
     // The 4x6 sheet has a fixed physical height — the name banner (if any) shares that space
     // with the photos rather than extending past it. It sits directly below the photo content,
     // above the bottom border, and is identical on both resulting 2x6 strips.
-    const bannerH = templateActive ? Math.round((config.template.bannerHeight ?? 100) * (stripW / 600)) : 0;
+    const bannerH = bannerTemplateActive ? Math.round((config.template.bannerHeight ?? 100) * (stripW / 600)) : 0;
     const availableV = stripH - TRIM_TOP - TRIM_BOTTOM;
     const contentH = availableV - 2 * border - bannerH;
     const bannerTop = TRIM_TOP + border + contentH;
@@ -312,10 +343,14 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
     if (bannerH > 0) {
       leftComposites.push({ input: buildBannerSvg(leftContentW, bannerH), left: TRIM_LEFT + border, top: bannerTop });
     }
-    const leftCopy = await sharp({ create: { width: stripW, height: stripH, channels: 3, background: backgroundColor } })
-      .composite(leftComposites)
-      .png()
-      .toBuffer();
+    const leftCopy = await renderStripTemplateLayered({
+      width: stripW,
+      height: stripH,
+      backgroundColor,
+      contentComposites: leftComposites,
+      stripTemplateBuf,
+      placement: stripTemplatePlacement,
+    });
 
     // Right copy: outer border compensated on the right, top and bottom; cut-side (left)
     // border stays as-is.
@@ -325,10 +360,14 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
     if (bannerH > 0) {
       rightComposites.push({ input: buildBannerSvg(rightContentW, bannerH), left: border, top: bannerTop });
     }
-    const rightCopy = await sharp({ create: { width: stripW, height: stripH, channels: 3, background: backgroundColor } })
-      .composite(rightComposites)
-      .png()
-      .toBuffer();
+    const rightCopy = await renderStripTemplateLayered({
+      width: stripW,
+      height: stripH,
+      backgroundColor,
+      contentComposites: rightComposites,
+      stripTemplateBuf,
+      placement: stripTemplatePlacement,
+    });
 
     await sharp({ create: { width: 1200, height: 1800, channels: 3, background: backgroundColor } })
       .composite([
@@ -348,7 +387,7 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
 
     // Name banner (if any) shares the fixed 1800px height budget with the photo, sitting
     // directly below it and above the bottom border.
-    const bannerH = templateActive ? Math.round((config.template.bannerHeight ?? 100) * (1200 / 600)) : 0;
+    const bannerH = bannerTemplateActive ? Math.round((config.template.bannerHeight ?? 100) * (1200 / 600)) : 0;
     const contentW = 1200 - TRIM_LEFT - TRIM_RIGHT - 2 * border;
     const contentH = 1800 - TRIM_TOP - TRIM_BOTTOM - 2 * border - bannerH;
     const bannerTop = TRIM_TOP + border + contentH;
@@ -382,6 +421,120 @@ async function printFile(filepath, copies = 1, type = 'single', withTemplate = f
   } finally {
     if (tmpPng) await unlink(tmpPng).catch(() => {});
   }
+}
+
+async function normalizeCollageStrip(filepath) {
+  const stripMeta = await sharp(filepath).metadata();
+  if (stripMeta.width === STRIP_TEMPLATE_W && stripMeta.height === STRIP_TEMPLATE_H) {
+    return sharp(filepath).toBuffer();
+  }
+  console.warn(`Collage strip was ${stripMeta.width}x${stripMeta.height}, expected ${STRIP_TEMPLATE_W}x${STRIP_TEMPLATE_H} — resizing to fit.`);
+  return sharp(filepath).resize(STRIP_TEMPLATE_W, STRIP_TEMPLATE_H, { fit: 'fill' }).toBuffer();
+}
+
+async function renderDownloadAsset(filepath, type, withTemplate = false) {
+  if (!withTemplate || !config.template?.enabled) {
+    if (type === 'collage') return normalizeCollageStrip(filepath);
+    const { pipeline } = await toPortrait(filepath);
+    return pipeline.png().toBuffer();
+  }
+
+  return type === 'collage'
+    ? renderTemplatedCollageDownload(filepath)
+    : renderTemplatedSingleDownload(filepath);
+}
+
+async function renderTemplatedCollageDownload(filepath) {
+  const backgroundColor = config.print?.backgroundColor ?? '#1a1a1a';
+  const border = config.print?.borderSize ?? 20;
+  const stripBuf = await normalizeCollageStrip(filepath);
+  const stripTemplatePath = getStripTemplateImagePath();
+  const stripTemplateBuf = stripTemplatePath ? await sharp(stripTemplatePath).png().toBuffer() : null;
+  const placement = getStripTemplatePlacement();
+
+  if (stripTemplateBuf) {
+    const nMatch = path.basename(filepath).match(/collage_n(\d+)_/);
+    const n = nMatch ? parseInt(nMatch[1], 10) : (config.collage?.shots ?? 3);
+    const thumbH = Math.floor((STRIP_TEMPLATE_H - border * (n + 1)) / n);
+    const thumbW = STRIP_TEMPLATE_W - 2 * border;
+    const composites = [];
+
+    for (let i = 0; i < n; i++) {
+      const photoBuf = await sharp(stripBuf)
+        .extract({ left: border, top: border + i * (thumbH + border), width: thumbW, height: thumbH })
+        .toBuffer();
+      composites.push({ input: photoBuf, left: border, top: border + i * (thumbH + border) });
+    }
+
+    return renderStripTemplateLayered({
+      width: STRIP_TEMPLATE_W,
+      height: STRIP_TEMPLATE_H,
+      backgroundColor,
+      contentComposites: composites,
+      stripTemplateBuf,
+      placement,
+    });
+  }
+
+  if (!config.template?.text) {
+    return sharp(stripBuf)
+      .png()
+      .toBuffer();
+  }
+
+  const nMatch = path.basename(filepath).match(/collage_n(\d+)_/);
+  const n = nMatch ? parseInt(nMatch[1], 10) : (config.collage?.shots ?? 3);
+  const contentBuf = await sharp(stripBuf)
+    .extract({
+      left: border,
+      top: border,
+      width: STRIP_TEMPLATE_W - 2 * border,
+      height: STRIP_TEMPLATE_H - 2 * border,
+    })
+    .toBuffer();
+
+  const bannerH = Math.round((config.template.bannerHeight ?? 100) * (STRIP_TEMPLATE_W / 600));
+  const contentW = STRIP_TEMPLATE_W - 2 * border;
+  const contentH = STRIP_TEMPLATE_H - 2 * border - bannerH;
+  const oldThumbW = STRIP_TEMPLATE_W - 2 * border;
+  const oldThumbH = Math.floor((STRIP_TEMPLATE_H - border * (n + 1)) / n);
+  const newThumbH = Math.floor((contentH - border * (n - 1)) / n);
+  const composites = [];
+
+  for (let i = 0; i < n; i++) {
+    const photoBuf = await sharp(contentBuf)
+      .extract({ left: 0, top: i * (oldThumbH + border), width: oldThumbW, height: oldThumbH })
+      .resize(contentW, newThumbH, { fit: 'cover' })
+      .toBuffer();
+    composites.push({ input: photoBuf, left: border, top: border + i * (newThumbH + border) });
+  }
+  composites.push({ input: buildBannerSvg(contentW, bannerH), left: border, top: border + contentH });
+
+  return sharp({ create: { width: STRIP_TEMPLATE_W, height: STRIP_TEMPLATE_H, channels: 3, background: backgroundColor } })
+    .composite(composites)
+    .png()
+    .toBuffer();
+}
+
+async function renderTemplatedSingleDownload(filepath) {
+  const border = config.print?.borderSize ?? 0;
+  const backgroundColor = config.print?.backgroundColor ?? '#1a1a1a';
+  const bannerH = config.template?.text ? Math.round((config.template.bannerHeight ?? 100) * (1200 / 600)) : 0;
+  const contentW = 1200 - TRIM_LEFT - TRIM_RIGHT - 2 * border;
+  const contentH = 1800 - TRIM_TOP - TRIM_BOTTOM - 2 * border - bannerH;
+  const bannerTop = TRIM_TOP + border + contentH;
+  const { pipeline } = await toPortrait(filepath);
+  const content = await pipeline.resize(contentW, contentH, { fit: 'cover' }).toBuffer();
+  const composites = [{ input: content, left: TRIM_LEFT + border, top: TRIM_TOP + border }];
+
+  if (bannerH > 0) {
+    composites.push({ input: buildBannerSvg(contentW, bannerH), left: TRIM_LEFT + border, top: bannerTop });
+  }
+
+  return sharp({ create: { width: 1200, height: 1800, channels: 3, background: backgroundColor } })
+    .composite(composites)
+    .png()
+    .toBuffer();
 }
 
 // TODO: finish this once we know the DNP DS-RX1's actual USB vendor/product ID from `lsusb`
@@ -434,6 +587,38 @@ function buildBannerSvg(width, bannerH) {
       font-size="${fontSize}" fill="${fontColor}" font-family="Georgia, serif">${text}</text>
   </svg>`;
   return Buffer.from(svg);
+}
+
+function getStripTemplateImagePath() {
+  const imageFilename = path.basename(config.template?.imageFilename ?? '');
+  if (!imageFilename) return null;
+  const templatePath = path.join(TEMPLATE_DIR, imageFilename);
+  return existsSync(templatePath) ? templatePath : null;
+}
+
+function getStripTemplatePlacement() {
+  return config.template?.imagePlacement === 'overlay' ? 'overlay' : 'underlay';
+}
+
+async function renderStripTemplateLayered({ width, height, backgroundColor, contentComposites, stripTemplateBuf, placement }) {
+  const composites = [];
+  if (stripTemplateBuf && placement === 'underlay') {
+    composites.push({ input: stripTemplateBuf, left: 0, top: 0 });
+  }
+  composites.push(...contentComposites);
+  if (stripTemplateBuf && placement === 'overlay') {
+    composites.push({ input: stripTemplateBuf, left: 0, top: 0 });
+  }
+
+  return sharp({ create: { width, height, channels: 3, background: backgroundColor } })
+    .composite(composites)
+    .png()
+    .toBuffer();
+}
+
+async function persistConfig() {
+  await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2));
+  broadcast({ event: 'config_updated' });
 }
 
 // --- Routes ---
@@ -659,9 +844,74 @@ app.post('/admin/config', requirePin, async (req, res) => {
     const { updates } = req.body;
     // Deep merge updates into config
     config = deepMerge(config, updates);
-    await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2));
-    // Broadcast config change to all clients
-    broadcast({ event: 'config_updated' });
+    await persistConfig();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /admin/template-image - upload a full-strip overlay image for collage prints.
+app.post('/admin/template-image', requirePin, async (req, res) => {
+  try {
+    const { imageData } = req.body;
+    if (typeof imageData !== 'string') {
+      return res.status(400).json({ success: false, error: 'imageData is required' });
+    }
+
+    const match = imageData.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+    if (!match) {
+      return res.status(400).json({ success: false, error: 'Upload a PNG, JPEG, or WebP image' });
+    }
+
+    const inputBuffer = Buffer.from(match[2], 'base64');
+    const metadata = await sharp(inputBuffer).metadata();
+    if (!metadata.width || !metadata.height) {
+      return res.status(400).json({ success: false, error: 'Could not read image dimensions' });
+    }
+
+    const expectedRatio = STRIP_TEMPLATE_W / STRIP_TEMPLATE_H;
+    const actualRatio = metadata.width / metadata.height;
+    if (Math.abs(actualRatio - expectedRatio) > 0.03) {
+      return res.status(400).json({ success: false, error: 'Image must use the 2x6 strip ratio (1:3)' });
+    }
+
+    const outputPath = path.join(TEMPLATE_DIR, STRIP_TEMPLATE_FILENAME);
+    await sharp(inputBuffer)
+      .rotate()
+      .resize(STRIP_TEMPLATE_W, STRIP_TEMPLATE_H, {
+        fit: 'contain',
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .png()
+      .toFile(outputPath);
+
+    const imageUpdatedAt = Date.now();
+    config = deepMerge(config, {
+      template: {
+        imageFilename: STRIP_TEMPLATE_FILENAME,
+        imageUpdatedAt,
+      },
+    });
+    await persistConfig();
+    res.json({ success: true, imageFilename: STRIP_TEMPLATE_FILENAME, imageUpdatedAt });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /admin/template-image - remove the uploaded strip overlay image.
+app.delete('/admin/template-image', requirePin, async (req, res) => {
+  try {
+    const templatePath = getStripTemplateImagePath();
+    if (templatePath) await unlink(templatePath).catch(() => {});
+    config = deepMerge(config, {
+      template: {
+        imageFilename: null,
+        imageUpdatedAt: 0,
+      },
+    });
+    await persistConfig();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

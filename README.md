@@ -160,6 +160,8 @@ Access everything at `http://<pi-ip>` (no port number needed).
 | `booth.autoReturnSeconds` | Seconds before auto-returning home (0 = disabled) |
 | `booth.matchDslrAspect` | Crops the iPad's live preview to a 2:3 portrait box (matching the DSLR photo) instead of filling the whole screen |
 | `template.enabled` | Apply text overlay at print time |
+| `template.imageFilename` | Uploaded full-strip overlay image for collage prints |
+| `template.imagePlacement` | Whether uploaded strip art sits under or over strip photos |
 | `template.text` | Overlay text (e.g. event name and date) |
 | `template.fontSize` | Font size in px (at 600px width baseline, auto-scales) |
 | `template.fontColor` | Hex color for overlay text |

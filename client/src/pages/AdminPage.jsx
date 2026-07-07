@@ -19,6 +19,8 @@ export default function AdminPage({ onExit }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [templateBusy, setTemplateBusy] = useState(false);
+  const [templateError, setTemplateError] = useState('');
 
   // Gallery state
   const [galleryCounts, setGalleryCounts] = useState({ single: 0, 'strip-shot': 0, strip: 0 });
@@ -31,7 +33,12 @@ export default function AdminPage({ onExit }) {
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmPrint, setConfirmPrint] = useState(false);
+  const [confirmDownload, setConfirmDownload] = useState(false);
   const loadMoreRef = useRef(null);
+
+  const templateImageUrl = config?.template?.imageFilename
+    ? `/template-images/${encodeURIComponent(config.template.imageFilename)}?v=${config.template.imageUpdatedAt ?? 0}`
+    : '';
 
   useEffect(() => {
     if (!unlocked) return;
@@ -137,13 +144,77 @@ export default function AdminPage({ onExit }) {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      flashSaved();
     } catch (e) {
       console.error('Save failed:', e);
       setError(e.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  function flashSaved() {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  }
+
+  async function handleTemplateUpload(file) {
+    if (!file) return;
+    setTemplateBusy(true);
+    setTemplateError('');
+    setError('');
+    try {
+      const imageData = await readFileAsDataUrl(file);
+      const res = await fetch(API('/template-image'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin, imageData }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Upload failed');
+      setConfig((prev) => ({
+        ...prev,
+        template: {
+          ...prev.template,
+          imageFilename: data.imageFilename,
+          imageUpdatedAt: data.imageUpdatedAt,
+        },
+      }));
+      flashSaved();
+    } catch (e) {
+      console.error('Template upload failed:', e);
+      setTemplateError(e.message);
+    } finally {
+      setTemplateBusy(false);
+    }
+  }
+
+  async function handleRemoveTemplate() {
+    setTemplateBusy(true);
+    setTemplateError('');
+    setError('');
+    try {
+      const res = await fetch(API('/template-image'), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Remove failed');
+      setConfig((prev) => ({
+        ...prev,
+        template: {
+          ...prev.template,
+          imageFilename: null,
+          imageUpdatedAt: 0,
+        },
+      }));
+      flashSaved();
+    } catch (e) {
+      console.error('Template remove failed:', e);
+      setTemplateError(e.message);
+    } finally {
+      setTemplateBusy(false);
     }
   }
 
@@ -232,10 +303,18 @@ export default function AdminPage({ onExit }) {
       }
     }
 
+    function handleDownload(withTemplate) {
+      setConfirmDownload(false);
+      const href = withTemplate
+        ? `/api/photos/download-rendered/${encodeURIComponent(selectedPhoto.filename)}?withTemplate=true`
+        : (selectedPhoto.downloadUrl ?? selectedPhoto.url);
+      window.location.assign(href);
+    }
+
     return (
       <div className={styles.fullscreen}>
         <img src={selectedPhoto.url} alt="Photo" className={styles.fullImg} />
-        <button className={styles.closeBtn} onClick={() => { setSelectedPhoto(null); setConfirmDelete(false); setConfirmPrint(false); }}>X</button>
+        <button className={styles.closeBtn} onClick={() => { setSelectedPhoto(null); setConfirmDelete(false); setConfirmPrint(false); setConfirmDownload(false); }}>X</button>
         {confirmDelete ? (
           <div className={styles.deleteConfirm}>
             <span>Delete this photo?</span>
@@ -249,9 +328,16 @@ export default function AdminPage({ onExit }) {
             <button className={styles.deleteBtnCancel} onClick={() => handlePrint(false)}>Without template</button>
             <button className={styles.deleteBtnCancel} onClick={() => setConfirmPrint(false)}>Cancel</button>
           </div>
+        ) : confirmDownload ? (
+          <div className={styles.deleteConfirm}>
+            <span>Download with template overlay?</span>
+            <button className={styles.deleteBtnConfirm} onClick={() => handleDownload(true)}>With template</button>
+            <button className={styles.deleteBtnCancel} onClick={() => handleDownload(false)}>Without template</button>
+            <button className={styles.deleteBtnCancel} onClick={() => setConfirmDownload(false)}>Cancel</button>
+          </div>
         ) : (
           <div className={styles.photoActions}>
-            <a className={styles.photoActionBtn} href={selectedPhoto.downloadUrl ?? selectedPhoto.url}>Download</a>
+            <button className={styles.photoActionBtn} onClick={() => setConfirmDownload(true)}>Download</button>
             <button className={styles.photoActionBtn} onClick={() => setConfirmPrint(true)}>Print</button>
             <button className={`${styles.photoActionBtn} ${styles.photoActionDanger}`} onClick={() => setConfirmDelete(true)}>Delete</button>
           </div>
@@ -352,6 +438,48 @@ export default function AdminPage({ onExit }) {
               <h2 className={styles.sectionTitle}>Photo Template</h2>
               <Toggle label="Enabled" value={config.template?.enabled ?? false}
                 onChange={(v) => set('template.enabled', v)} />
+              <p className={styles.fieldHint}>Upload a full 2x6 strip template image to use on strip prints. When an image is present, it overrides the basic banner below for photo strips only.</p>
+              <div className={styles.templateActions}>
+                <label className={styles.btnSecondary}>
+                  {templateBusy ? 'Uploading…' : 'Upload Strip Template'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className={styles.hiddenFileInput}
+                    disabled={templateBusy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      handleTemplateUpload(file);
+                    }}
+                  />
+                </label>
+                <button
+                  className={styles.btnSecondary}
+                  onClick={handleRemoveTemplate}
+                  disabled={templateBusy || !config.template?.imageFilename}
+                >
+                  Remove Uploaded Image
+                </button>
+              </div>
+              <OptionToggle
+                label="Uploaded Image Placement"
+                value={config.template?.imagePlacement ?? 'underlay'}
+                options={[
+                  { value: 'underlay', label: 'Underlay' },
+                  { value: 'overlay', label: 'Overlay' },
+                ]}
+                onChange={(v) => set('template.imagePlacement', v)}
+              />
+              <p className={styles.fieldHint}>Recommended: transparent PNG, designed at 600x1800px or any matching 1:3 ratio.</p>
+              {templateImageUrl ? (
+                <div className={styles.templatePreviewCard}>
+                  <img src={templateImageUrl} alt="Strip template preview" className={styles.templatePreviewImg} />
+                </div>
+              ) : (
+                <p className={styles.fieldHint}>No strip template image uploaded.</p>
+              )}
+              {templateError && <p className={styles.errorMsg}>{templateError}</p>}
               <Field label="Text" value={config.template?.text ?? ''}
                 onChange={(v) => set('template.text', v)} />
               <NumberField label="Font Size (px at 600px width)" value={config.template?.fontSize ?? 48}
@@ -528,4 +656,32 @@ function Toggle({ label, value, onChange }) {
       </button>
     </div>
   );
+}
+
+function OptionToggle({ label, value, options, onChange }) {
+  return (
+    <div className={styles.field}>
+      <span className={styles.fieldLabel}>{label}</span>
+      <div className={styles.optionToggle}>
+        {options.map((option) => (
+          <button
+            key={option.value}
+            className={`${styles.optionToggleBtn} ${value === option.value ? styles.optionToggleBtnActive : ''}`}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read image file'));
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
 }

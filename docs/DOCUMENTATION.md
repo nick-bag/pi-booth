@@ -223,6 +223,14 @@ All configuration lives in `server/config.json`. Changes made via the admin pane
     "singlePrintCopies": 1,
     "collagePrintCopies": 2
   },
+  "template": {
+    "enabled": true,
+    "text": "Your Names · Your Date",
+    "bannerHeight": 100,
+    "overlayColor": "#000000",
+    "imageFilename": null,
+    "imageUpdatedAt": 0
+  },
   "gallery": {
     "enabled": true
   },
@@ -252,6 +260,7 @@ The admin panel is hidden from guests and accessible via a **secret gesture**: t
 | Print Settings | Printer name, copies per type, enable/disable |
 | Features | Toggle single photos, photo strips, gallery, simulate mode |
 | Countdown | Seconds per countdown, delay between collage shots |
+| Photo Template | Basic text banner settings plus uploaded strip overlay image |
 | Admin PIN | Change the admin PIN |
 
 Changes are saved to `config.json` on the server and broadcast to all connected clients via WebSocket so the UI updates immediately without a page refresh.

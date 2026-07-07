@@ -54,6 +54,9 @@
     "enabled": true,
     "text": "Your Names · Your Date",
     "bannerHeight": 100,
-    "overlayColor": "#000000"
+    "overlayColor": "#000000",
+    "imageFilename": null,
+    "imageUpdatedAt": 0,
+    "imagePlacement": "underlay"
   }
 }
