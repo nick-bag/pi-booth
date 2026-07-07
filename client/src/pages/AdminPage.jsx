@@ -308,7 +308,14 @@ export default function AdminPage({ onExit }) {
       const href = withTemplate
         ? `/api/photos/download-rendered/${encodeURIComponent(selectedPhoto.filename)}?withTemplate=true`
         : (selectedPhoto.downloadUrl ?? selectedPhoto.url);
-      window.location.assign(href);
+      const link = document.createElement('a');
+      link.href = href;
+      if (withTemplate) {
+        link.download = `${selectedPhoto.filename.replace(/\.[^.]+$/u, '')}_with_template.png`;
+      }
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     }
 
     return (
