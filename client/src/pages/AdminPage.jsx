@@ -306,7 +306,7 @@ export default function AdminPage({ onExit }) {
     function handleDownload(withTemplate) {
       setConfirmDownload(false);
       const href = withTemplate
-        ? `/api/photos/download-rendered/${encodeURIComponent(selectedPhoto.filename)}?withTemplate=true`
+        ? `/photos/download-rendered/${encodeURIComponent(selectedPhoto.filename)}?withTemplate=true`
         : (selectedPhoto.downloadUrl ?? selectedPhoto.url);
       const link = document.createElement('a');
       link.href = href;
