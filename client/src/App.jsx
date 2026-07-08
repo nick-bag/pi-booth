@@ -21,6 +21,18 @@ function getCapturePreviewAspect(captureType, config) {
   return 2 / 3;
 }
 
+function getStartPreviewAspect(config) {
+  if (config?.collage?.enabled ?? true) {
+    return getCapturePreviewAspect('collage', config);
+  }
+
+  if (config?.picture?.enabled ?? true) {
+    return getCapturePreviewAspect('single', config);
+  }
+
+  return null;
+}
+
 export default function App() {
   const [view, setView] = useState(VIEWS.START);
   const [captureType, setCaptureType] = useState(null);
@@ -129,7 +141,10 @@ export default function App() {
   const capturePreviewAspect = view === VIEWS.CAPTURE && captureType
     ? getCapturePreviewAspect(captureType, config)
     : null;
-  const frameAspect = capturePreviewAspect ?? (config?.booth?.matchDslrAspect ? 2 / 3 : null);
+  const startPreviewAspect = view === VIEWS.START ? getStartPreviewAspect(config) : null;
+  const frameAspect = capturePreviewAspect
+    ?? startPreviewAspect
+    ?? (config?.booth?.matchDslrAspect ? 2 / 3 : null);
   const viewportAspect = viewportSize.width / Math.max(viewportSize.height, 1);
   const constrainedFrameStyle = frameAspect
     ? (
@@ -147,7 +162,7 @@ export default function App() {
         width: '100%',
         height: '100%',
       };
-  const showFrameGuide = Boolean(capturePreviewAspect);
+  const showFrameGuide = Boolean(capturePreviewAspect || startPreviewAspect);
 
   return (
     <div className="appRoot">
