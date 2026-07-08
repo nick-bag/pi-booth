@@ -323,10 +323,11 @@ async function buildCollageStrip(imagePaths) {
 
   const composites = await Promise.all(
     imagePaths.map(async (imgPath, i) => {
-      // Apply the same EXIF-aware orientation correction used for single photos — without
-      // this, shots from a portrait-mounted camera would be resized/cropped while sideways.
-      const { pipeline } = await toPortrait(imgPath);
-      const resized = await pipeline
+      // For strip shots, keep the photo upright relative to how it was shot, then crop it into
+      // the strip slot's aspect ratio. Forcing portrait here would rotate landscape DSLR shots
+      // sideways, which is correct only for portrait-mounted capture setups.
+      const resized = await sharp(imgPath)
+        .rotate()
         .resize(THUMB_W, THUMB_H, { fit: 'cover' })
         .toBuffer();
       return { input: resized, top: border + i * (THUMB_H + border), left: border };
