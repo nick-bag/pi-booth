@@ -112,9 +112,9 @@ export default function CapturePage({ type, config, camReady, onBack }) {
 
         if (nextShot < totalShots) {
           // Show the just-captured shot for a moment before the next countdown.
-          // Use the small cached thumbnail (not the full-res original) — full-res
-          // camera files are several MB and were making this preview noticeably slow.
-          setShotPreviewUrl(data.thumbUrl ?? data.url);
+          // Prefer the cached strip-slot crop so the preview matches the final strip framing
+          // without having to load the full-resolution original.
+          setShotPreviewUrl(data.previewUrl ?? data.thumbUrl ?? data.url);
           setPhase(PHASES.SHOT_PREVIEW);
           setTimeout(() => {
             setShotIndex(nextShot);

@@ -143,6 +143,31 @@ app.get('/photos/preview/:filename', async (req, res) => {
   }
 });
 
+// GET /photos/strip-preview/:filename - cached cropped preview for a single collage shot,
+// using the same slot aspect ratio the final strip builder uses.
+app.get('/photos/strip-preview/:filename', async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    const srcPath = path.join(PHOTOS_DIR, filename);
+    if (!existsSync(srcPath)) return res.status(404).end();
+
+    const previewPath = path.join(PREVIEWS_DIR, `${filename}__strip-slot.jpg`);
+    if (!existsSync(previewPath)) {
+      const slot = getCollageSlotDimensions();
+      await sharp(srcPath)
+        .rotate()
+        .resize(slot.width * 2, slot.height * 2, { fit: 'cover' })
+        .jpeg({ quality: 82 })
+        .toFile(previewPath);
+    }
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    res.sendFile(previewPath);
+  } catch (err) {
+    console.error('Strip preview error:', err);
+    res.status(500).end();
+  }
+});
+
 // Strip /api prefix — Vite proxy does this in dev, we do it here in production
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {
@@ -173,6 +198,15 @@ function buildGalleryPhoto(filename) {
     previewUrl: `/photos/preview/${encodeURIComponent(filename)}`,
     downloadUrl: `/photos/download/${encodeURIComponent(filename)}`,
     thumbUrl: `/photos/thumb/${filename}`,
+  };
+}
+
+function getCollageSlotDimensions(shots = config.collage?.shots ?? 3) {
+  const safeShots = Math.max(1, shots);
+  const border = config.print?.borderSize ?? 20;
+  return {
+    width: STRIP_TEMPLATE_W - border * 2,
+    height: Math.floor((STRIP_TEMPLATE_H - border * (safeShots + 1)) / safeShots),
   };
 }
 
@@ -824,7 +858,13 @@ app.post('/capture/shot', async (req, res) => {
   try {
     const filename = `collage_shot_${Date.now()}.jpg`;
     await capturePhoto(filename);
-    res.json({ success: true, filename, url: `/photos/${filename}`, thumbUrl: `/photos/thumb/${filename}` });
+    res.json({
+      success: true,
+      filename,
+      url: `/photos/${filename}`,
+      thumbUrl: `/photos/thumb/${filename}`,
+      previewUrl: `/photos/strip-preview/${filename}`,
+    });
   } catch (err) {
     console.error('Shot capture error:', err);
     res.status(500).json({ success: false, error: err.message });
