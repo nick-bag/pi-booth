@@ -39,6 +39,19 @@ html, body, #root {
   width: 100%;
   height: calc(100% - env(safe-area-inset-top));
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+}
+
+.appPreviewWindow {
+  position: relative;
+  overflow: hidden;
+}
+
+.appPreviewWindowGuided {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.22);
 }
 
 .appPreviewMedia {
@@ -58,18 +71,6 @@ html, body, #root {
 
 .appPreviewReady {
   opacity: 1;
-}
-
-/* "Match DSLR Aspect Ratio" test mode — crops the live preview to a 2:3 portrait box
-   (matching the DSLR's final photo) instead of filling the whole screen, so guests
-   frame themselves closer to what the camera will actually capture. Anything outside
-   the box falls back to the app's background color, acting as a visual letterbox. */
-.appVideoFrameConstrained {
-  left: 50%;
-  width: auto;
-  height: calc(100% - env(safe-area-inset-top));
-  aspect-ratio: var(--app-preview-aspect, 2 / 3);
-  transform: translateX(-50%);
 }
 
 .appContent {

@@ -15,10 +15,10 @@ function getCapturePreviewAspect(captureType, config) {
     const border = Math.max(0, config?.print?.borderSize ?? 20);
     const thumbW = Math.max(1, STRIP_W - border * 2);
     const thumbH = Math.max(1, Math.floor((STRIP_H - border * (shots + 1)) / shots));
-    return `${thumbW} / ${thumbH}`;
+    return thumbW / thumbH;
   }
 
-  return '2 / 3';
+  return 2 / 3;
 }
 
 export default function App() {
@@ -32,9 +32,25 @@ export default function App() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [camReady, setCamReady] = useState(false);
+  const [viewportSize, setViewportSize] = useState(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
   const previewSource = !config
     ? null
     : (config.camera?.simulateCapture ? 'client' : (config.camera?.previewSource ?? 'client'));
+
+  useEffect(() => {
+    function handleResize() {
+      setViewportSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (!previewSource) {
@@ -113,45 +129,65 @@ export default function App() {
   const capturePreviewAspect = view === VIEWS.CAPTURE && captureType
     ? getCapturePreviewAspect(captureType, config)
     : null;
-  const frameAspect = capturePreviewAspect ?? (config?.booth?.matchDslrAspect ? '2 / 3' : null);
+  const frameAspect = capturePreviewAspect ?? (config?.booth?.matchDslrAspect ? 2 / 3 : null);
+  const viewportAspect = viewportSize.width / Math.max(viewportSize.height, 1);
+  const constrainedFrameStyle = frameAspect
+    ? (
+        frameAspect > viewportAspect
+          ? {
+              width: '100%',
+              height: `${(viewportAspect / frameAspect) * 100}%`,
+            }
+          : {
+              width: `${(frameAspect / viewportAspect) * 100}%`,
+              height: '100%',
+            }
+      )
+    : {
+        width: '100%',
+        height: '100%',
+      };
+  const showFrameGuide = Boolean(capturePreviewAspect);
 
   return (
     <div className="appRoot">
-      <div
-        className={[
-          'appVideoFrame',
-          frameAspect && 'appVideoFrameConstrained',
-        ].filter(Boolean).join(' ')}
-        style={frameAspect ? { '--app-preview-aspect': frameAspect } : undefined}
-      >
-        {previewSource === 'client' ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className={[
-              'appPreviewMedia',
-              camReady && 'appPreviewReady',
-              (config?.booth?.mirrorLivePreview ?? true) && 'appPreviewMirrored',
-            ].filter(Boolean).join(' ')}
-            style={{ '--app-video-scale': previewZoom }}
-          />
-        ) : previewSource === 'dslr' ? (
-          <img
-            key={previewSource}
-            src={DSLR_STREAM_URL}
-            alt=""
-            onLoad={() => setCamReady(true)}
-            onError={() => setCamReady(false)}
-            className={[
-              'appPreviewMedia',
-              camReady && 'appPreviewReady',
-              (config?.booth?.mirrorLivePreview ?? true) && 'appPreviewMirrored',
-            ].filter(Boolean).join(' ')}
-            style={{ '--app-video-scale': previewZoom }}
-          />
-        ) : null}
+      <div className="appVideoFrame">
+        <div
+          className={[
+            'appPreviewWindow',
+            showFrameGuide && 'appPreviewWindowGuided',
+          ].filter(Boolean).join(' ')}
+          style={constrainedFrameStyle}
+        >
+          {previewSource === 'client' ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={[
+                'appPreviewMedia',
+                camReady && 'appPreviewReady',
+                (config?.booth?.mirrorLivePreview ?? true) && 'appPreviewMirrored',
+              ].filter(Boolean).join(' ')}
+              style={{ '--app-video-scale': previewZoom }}
+            />
+          ) : previewSource === 'dslr' ? (
+            <img
+              key={previewSource}
+              src={DSLR_STREAM_URL}
+              alt=""
+              onLoad={() => setCamReady(true)}
+              onError={() => setCamReady(false)}
+              className={[
+                'appPreviewMedia',
+                camReady && 'appPreviewReady',
+                (config?.booth?.mirrorLivePreview ?? true) && 'appPreviewMirrored',
+              ].filter(Boolean).join(' ')}
+              style={{ '--app-video-scale': previewZoom }}
+            />
+          ) : null}
+        </div>
       </div>
       <div className="appContent">
         {pageContent}
