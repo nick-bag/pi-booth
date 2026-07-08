@@ -160,7 +160,7 @@ Access everything at `http://<pi-ip>` (no port number needed).
 | `collage.shotPreviewSeconds` | How long each shot preview is shown |
 | `single.countdownSeconds` | Countdown duration for single photos |
 | `booth.autoReturnSeconds` | Seconds before auto-returning home (0 = disabled) |
-| `booth.matchDslrAspect` | Crops the live preview to a 2:3 portrait box (matching the DSLR photo) instead of filling the whole screen |
+| `booth.matchDslrAspect` | Test toggle for constraining the idle preview to a 2:3 portrait box; active capture screens now match the final output crop automatically |
 | `template.enabled` | Apply text overlay at print time |
 | `template.imageFilename` | Uploaded full-strip overlay image for collage prints |
 | `template.imagePlacement` | Whether uploaded strip art sits under or over strip photos |

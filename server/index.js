@@ -357,32 +357,33 @@ const TRIM_RIGHT = 20;
 const TRIM_TOP = 5;
 const TRIM_BOTTOM = 40;
 
-// Rotate landscape captures to portrait so downstream border/trim math — measured against a
-// portrait 4x6 page — applies correctly. Real camera files carry an EXIF orientation tag set
-// by the camera's own orientation sensor, which correctly reflects how it's physically mounted
-// (landscape or portrait) — so that tag is trusted via sharp's auto-orient rotate() when present.
-// Only falls back to the old "rotate 90 if landscape" heuristic for sources with no EXIF
-// orientation data at all (e.g. the simulated capture placeholder).
+// Normalize captures to portrait so downstream border/trim math — measured against a portrait
+// 4x6 page — applies correctly. EXIF auto-orient is still applied first, but some valid EXIF
+// states (like 1 or 3) remain landscape after that step, so we explicitly rotate those once
+// more to force a portrait result for the booth layouts.
 // Returns a sharp pipeline plus the resulting (already-portrait) width/height.
 async function toPortrait(filepath) {
   const meta = await sharp(filepath).metadata();
   const orientation = meta.orientation ?? 1;
+  const swapped = orientation >= 5 && orientation <= 8;
+  const orientedWidth = swapped ? meta.height : meta.width;
+  const orientedHeight = swapped ? meta.width : meta.height;
+  const autoOriented = sharp(filepath).rotate();
 
-  if (orientation !== 1) {
-    // EXIF orientations 5-8 mean width/height are swapped once rotated for display.
-    const swapped = orientation >= 5 && orientation <= 8;
+  if (orientedWidth > orientedHeight) {
+    const portraitBuffer = await autoOriented.toBuffer();
     return {
-      pipeline: sharp(filepath).rotate(),
-      width: swapped ? meta.height : meta.width,
-      height: swapped ? meta.width : meta.height,
+      pipeline: sharp(portraitBuffer).rotate(90),
+      width: orientedHeight,
+      height: orientedWidth,
     };
   }
 
-  const needsRotate = meta.width > meta.height;
-  const pipeline = needsRotate ? sharp(filepath).rotate(90) : sharp(filepath);
-  const width = needsRotate ? meta.height : meta.width;
-  const height = needsRotate ? meta.width : meta.height;
-  return { pipeline, width, height };
+  return {
+    pipeline: autoOriented,
+    width: orientedWidth,
+    height: orientedHeight,
+  };
 }
 
 async function printFile(filepath, copies = 1, type = 'single', withTemplate = false) {

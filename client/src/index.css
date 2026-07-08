@@ -64,11 +64,11 @@ html, body, #root {
    (matching the DSLR's final photo) instead of filling the whole screen, so guests
    frame themselves closer to what the camera will actually capture. Anything outside
    the box falls back to the app's background color, acting as a visual letterbox. */
-.appVideoFrameAspect {
+.appVideoFrameConstrained {
   left: 50%;
   width: auto;
   height: calc(100% - env(safe-area-inset-top));
-  aspect-ratio: 2 / 3;
+  aspect-ratio: var(--app-preview-aspect, 2 / 3);
   transform: translateX(-50%);
 }
 

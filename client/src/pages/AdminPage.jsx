@@ -526,9 +526,9 @@ export default function AdminPage({ onExit }) {
               <Toggle label="Mirror Live Preview" value={config.booth?.mirrorLivePreview ?? true}
                 onChange={(v) => set('booth.mirrorLivePreview', v)} />
               <p className={styles.fieldHint}>When on, the live preview is mirrored left-to-right. Turn it off to match the saved DSLR photo orientation more closely.</p>
-              <Toggle label="Match DSLR Aspect Ratio (test)" value={config.booth?.matchDslrAspect ?? false}
+              <Toggle label="Constrain Idle Preview To 2:3 (test)" value={config.booth?.matchDslrAspect ?? false}
                 onChange={(v) => set('booth.matchDslrAspect', v)} />
-              <p className={styles.fieldHint}>Crops the live preview to a 2:3 portrait box (matching the DSLR photo) instead of filling the whole screen, so guests frame themselves closer to what the camera will actually capture.</p>
+              <p className={styles.fieldHint}>During actual capture, the live preview now matches the final output crop automatically. This test toggle only constrains the idle preview outside the capture flow.</p>
             </section>
 
             {/* Admin PIN */}

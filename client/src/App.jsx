@@ -6,6 +6,20 @@ import { usePhotobooth, apiConfig } from './hooks/usePhotobooth.js';
 
 const VIEWS = { START: 'start', CAPTURE: 'capture', ADMIN: 'admin' };
 const DSLR_STREAM_URL = '/api/camera/stream.mjpg';
+const STRIP_W = 600;
+const STRIP_H = 1800;
+
+function getCapturePreviewAspect(captureType, config) {
+  if (captureType === 'collage') {
+    const shots = Math.max(1, config?.collage?.shots ?? 3);
+    const border = Math.max(0, config?.print?.borderSize ?? 20);
+    const thumbW = Math.max(1, STRIP_W - border * 2);
+    const thumbH = Math.max(1, Math.floor((STRIP_H - border * (shots + 1)) / shots));
+    return `${thumbW} / ${thumbH}`;
+  }
+
+  return '2 / 3';
+}
 
 export default function App() {
   const [view, setView] = useState(VIEWS.START);
@@ -96,14 +110,19 @@ export default function App() {
   else pageContent = <StartPage config={config} onSelect={handleSelect} onTitleTap={handleTitleTap} />;
 
   const previewZoom = Math.max(config?.booth?.livePreviewZoomPercent ?? 100, 1) / 100;
+  const capturePreviewAspect = view === VIEWS.CAPTURE && captureType
+    ? getCapturePreviewAspect(captureType, config)
+    : null;
+  const frameAspect = capturePreviewAspect ?? (config?.booth?.matchDslrAspect ? '2 / 3' : null);
 
   return (
     <div className="appRoot">
       <div
         className={[
           'appVideoFrame',
-          config?.booth?.matchDslrAspect && 'appVideoFrameAspect',
+          frameAspect && 'appVideoFrameConstrained',
         ].filter(Boolean).join(' ')}
+        style={frameAspect ? { '--app-preview-aspect': frameAspect } : undefined}
       >
         {previewSource === 'client' ? (
           <video
