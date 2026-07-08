@@ -422,6 +422,7 @@ export default function AdminPage({ onExit }) {
                 onChange={(v) => set('collage.enabled', v)} />
               <Toggle label="Simulate Camera (no real camera)" value={config.camera.simulateCapture}
                 onChange={(v) => set('camera.simulateCapture', v)} />
+              <p className={styles.fieldHint}>When simulate camera is on, the live preview always uses the client camera even if DSLR preview is selected below.</p>
             </section>
 
             {/* Countdown */}
@@ -502,6 +503,16 @@ export default function AdminPage({ onExit }) {
             {/* Booth */}
             <section className={styles.section}>
               <h2 className={styles.sectionTitle}>Booth</h2>
+              <OptionToggle
+                label="Live Preview Source"
+                value={config.camera?.previewSource ?? 'client'}
+                options={[
+                  { value: 'client', label: 'Client Camera' },
+                  { value: 'dslr', label: 'DSLR Camera' },
+                ]}
+                onChange={(v) => set('camera.previewSource', v)}
+              />
+              <p className={styles.fieldHint}>Client Camera uses the iPad camera. DSLR Camera uses the Nikon live view stream and pauses it briefly for each still capture before resuming automatically.</p>
               <NumberField label="Auto-return After (sec, 0 = off)" value={config.booth?.autoReturnSeconds ?? 10}
                 onChange={(v) => set('booth.autoReturnSeconds', v)} min={0} max={60} />
               <NumberField label="Preview Time Before Auto-Print (sec, 0 = instant)" value={config.booth?.previewBeforePrintSeconds ?? 5}
@@ -511,13 +522,13 @@ export default function AdminPage({ onExit }) {
               <p className={styles.fieldHint}>Applies to the idle start screen and the countdown/capture screens.</p>
               <NumberField label="Live Preview Zoom (%)" value={config.booth?.livePreviewZoomPercent ?? 100}
                 onChange={(v) => set('booth.livePreviewZoomPercent', v)} min={50} max={200} step={1} />
-              <p className={styles.fieldHint}>Digital zoom for the iPad preview only. Increase it to make the live framing closer to the DSLR shot without affecting the actual photo file.</p>
+              <p className={styles.fieldHint}>Digital zoom for the live preview only. Increase it to tighten the framing without affecting the actual saved photo.</p>
               <Toggle label="Mirror Live Preview" value={config.booth?.mirrorLivePreview ?? true}
                 onChange={(v) => set('booth.mirrorLivePreview', v)} />
-              <p className={styles.fieldHint}>When on, the iPad preview behaves like a selfie mirror. Turn it off to match the DSLR photo's left/right orientation more closely.</p>
+              <p className={styles.fieldHint}>When on, the live preview is mirrored left-to-right. Turn it off to match the saved DSLR photo orientation more closely.</p>
               <Toggle label="Match DSLR Aspect Ratio (test)" value={config.booth?.matchDslrAspect ?? false}
                 onChange={(v) => set('booth.matchDslrAspect', v)} />
-              <p className={styles.fieldHint}>Crops the iPad's live preview to a 2:3 portrait box (matching the DSLR photo) instead of filling the whole screen, so guests frame themselves closer to what the camera will actually capture.</p>
+              <p className={styles.fieldHint}>Crops the live preview to a 2:3 portrait box (matching the DSLR photo) instead of filling the whole screen, so guests frame themselves closer to what the camera will actually capture.</p>
             </section>
 
             {/* Admin PIN */}

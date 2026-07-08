@@ -11,6 +11,7 @@
       "--capture-image-and-download",
       "--filename"
     ],
+    "previewSource": "client",
     "simulateCapture": true,
     "shutterDelayMs": 0
   },

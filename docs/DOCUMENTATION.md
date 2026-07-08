@@ -121,6 +121,7 @@ pi-booth/
 | `POST` | `/capture/shot` | Captures one shot for a collage (frontend manages timing) |
 | `POST` | `/collage/build` | Builds a 2x6 strip from an array of filenames |
 | `POST` | `/print` | Prints a photo via CUPS |
+| `GET` | `/camera/stream.mjpg` | Streams Nikon live view as MJPEG when DSLR preview is enabled |
 | `GET` | `/gallery` | Returns list of all photos |
 | `GET` | `/admin/config` | Returns full config (admin use) |
 | `POST` | `/admin/config` | Saves updated config (requires PIN) |
@@ -140,7 +141,7 @@ pi-booth/
 
 ### Camera Control
 
-Currently uses `gphoto2` CLI via `child_process.exec`. See [`docs/gphoto2-optimization.md`](./gphoto2-optimization.md) for a planned upgrade to `node-gphoto2` for lower latency.
+Currently uses `gphoto2` CLI via `child_process.exec` for still capture and `gphoto2 --capture-movie --stdout` for DSLR live preview. When DSLR preview is enabled, the server follows the required Nikon flow: stop live view, capture the still, then restart live view. See [`docs/gphoto2-optimization.md`](./gphoto2-optimization.md) for a planned upgrade to `node-gphoto2` for lower latency.
 
 ```bash
 gphoto2 --capture-image-and-download --filename "/path/to/photo.jpg" --force-overwrite
@@ -170,6 +171,7 @@ All top-level state lives in `App.jsx`:
 - `view` — current page (`start` | `capture` | `gallery` | `admin`)
 - `captureType` — `'single'` or `'collage'`
 - `config` — fetched from server on load, re-fetched on `config_updated` WS event
+- `camReady` — whether the active preview source has become ready (client camera or DSLR stream)
 
 ### CSS Variables
 
@@ -201,6 +203,7 @@ All configuration lives in `server/config.json`. Changes made via the admin pane
     "textColor": "#ffffff"
   },
   "camera": {
+    "previewSource": "client",
     "simulateCapture": false
   },
   "picture": {

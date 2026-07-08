@@ -3,7 +3,7 @@ import cors from 'cors';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'https';
 import { readFileSync, existsSync, mkdirSync } from 'fs';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { readdir, writeFile, unlink } from 'fs/promises';
 import sharp from 'sharp';
@@ -38,11 +38,20 @@ const TEMPLATE_DIR = path.join(__dirname, '../data/templates');
 const STRIP_TEMPLATE_FILENAME = 'strip-template.png';
 const STRIP_TEMPLATE_W = 600;
 const STRIP_TEMPLATE_H = 1800;
+const DSLR_STREAM_BOUNDARY = 'frame';
+const DSLR_STREAM_ARGS = ['--capture-movie', '--stdout'];
 
 if (!existsSync(PHOTOS_DIR)) mkdirSync(PHOTOS_DIR, { recursive: true });
 if (!existsSync(THUMBS_DIR)) mkdirSync(THUMBS_DIR, { recursive: true });
 if (!existsSync(PREVIEWS_DIR)) mkdirSync(PREVIEWS_DIR, { recursive: true });
 if (!existsSync(TEMPLATE_DIR)) mkdirSync(TEMPLATE_DIR, { recursive: true });
+
+let dslrPreviewProcess = null;
+let dslrPreviewBuffer = Buffer.alloc(0);
+let shuttingDown = false;
+let autoRestartDslrPreview = true;
+let captureInFlight = false;
+const dslrPreviewClients = new Set();
 
 const app = express();
 const server = createServer(httpsOptions, app);
@@ -167,23 +176,138 @@ function buildGalleryPhoto(filename) {
   };
 }
 
+function getPreviewSource() {
+  return config.camera?.previewSource === 'dslr' ? 'dslr' : 'client';
+}
+
+function shouldUseDslrPreview() {
+  return getPreviewSource() === 'dslr' && !config.camera?.simulateCapture;
+}
+
+function startDslrPreviewStream() {
+  if (dslrPreviewProcess || shuttingDown || !shouldUseDslrPreview()) return;
+
+  dslrPreviewBuffer = Buffer.alloc(0);
+  dslrPreviewProcess = spawn('gphoto2', DSLR_STREAM_ARGS, { stdio: ['ignore', 'pipe', 'pipe'] });
+
+  dslrPreviewProcess.stdout.on('data', (chunk) => {
+    dslrPreviewBuffer = Buffer.concat([dslrPreviewBuffer, chunk]);
+    flushDslrPreviewFrames();
+  });
+
+  dslrPreviewProcess.stderr.on('data', (chunk) => {
+    process.stderr.write(`[gphoto2 preview] ${chunk}`);
+  });
+
+  dslrPreviewProcess.on('close', (code, signal) => {
+    dslrPreviewProcess = null;
+    dslrPreviewBuffer = Buffer.alloc(0);
+
+    if (shuttingDown) return;
+    if (dslrPreviewClients.size > 0 && autoRestartDslrPreview && shouldUseDslrPreview()) {
+      process.stderr.write(`[gphoto2 preview] exited (code=${code}, signal=${signal}); restarting\n`);
+      setTimeout(startDslrPreviewStream, 500);
+    }
+  });
+}
+
+function stopDslrPreviewStream() {
+  if (!dslrPreviewProcess) return Promise.resolve();
+  const proc = dslrPreviewProcess;
+  dslrPreviewProcess = null;
+  dslrPreviewBuffer = Buffer.alloc(0);
+  return new Promise((resolve) => {
+    proc.once('close', () => resolve());
+    proc.kill('SIGTERM');
+  });
+}
+
+function closeDslrPreviewClients() {
+  for (const res of dslrPreviewClients) res.end();
+  dslrPreviewClients.clear();
+}
+
+function flushDslrPreviewFrames() {
+  while (true) {
+    const frame = extractDslrPreviewFrame();
+    if (!frame) return;
+    broadcastDslrPreviewFrame(frame);
+  }
+}
+
+function extractDslrPreviewFrame() {
+  const soi = dslrPreviewBuffer.indexOf(Buffer.from([0xff, 0xd8]));
+  if (soi === -1) {
+    if (dslrPreviewBuffer.length > 1024 * 1024) dslrPreviewBuffer = Buffer.alloc(0);
+    return null;
+  }
+
+  if (soi > 0) dslrPreviewBuffer = dslrPreviewBuffer.subarray(soi);
+
+  const eoi = dslrPreviewBuffer.indexOf(Buffer.from([0xff, 0xd9]), 2);
+  if (eoi === -1) return null;
+
+  const frame = dslrPreviewBuffer.subarray(0, eoi + 2);
+  dslrPreviewBuffer = dslrPreviewBuffer.subarray(eoi + 2);
+  return frame;
+}
+
+function broadcastDslrPreviewFrame(frame) {
+  const header = Buffer.from(
+    `--${DSLR_STREAM_BOUNDARY}\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.length}\r\n\r\n`,
+    'utf8',
+  );
+  const trailer = Buffer.from('\r\n', 'utf8');
+
+  for (const res of dslrPreviewClients) {
+    if (res.destroyed) {
+      dslrPreviewClients.delete(res);
+      continue;
+    }
+    res.write(header);
+    res.write(frame);
+    res.write(trailer);
+  }
+}
+
+async function withExclusiveCameraAccess(work) {
+  if (captureInFlight) throw new Error('Capture already in progress');
+
+  captureInFlight = true;
+  const hadDslrPreview = Boolean(dslrPreviewProcess);
+  autoRestartDslrPreview = false;
+  await stopDslrPreviewStream();
+
+  try {
+    return await work();
+  } finally {
+    autoRestartDslrPreview = true;
+    if (hadDslrPreview && dslrPreviewClients.size > 0 && shouldUseDslrPreview()) {
+      startDslrPreviewStream();
+    }
+    captureInFlight = false;
+  }
+}
+
 // Capture a single photo via gphoto2
 async function capturePhoto(filename) {
   const filepath = path.join(PHOTOS_DIR, filename);
-  if (config.camera.simulateCapture) {
-    // Generate a unique placeholder with a random background color
-    const r = Math.floor(Math.random() * 120) + 60;
-    const g = Math.floor(Math.random() * 120) + 60;
-    const b = Math.floor(Math.random() * 120) + 60;
-    await sharp({
-      create: { width: 1800, height: 1200, channels: 3, background: { r, g, b } },
-    }).jpeg().toFile(filepath);
+  return withExclusiveCameraAccess(async () => {
+    if (config.camera.simulateCapture) {
+      // Generate a unique placeholder with a random background color
+      const r = Math.floor(Math.random() * 120) + 60;
+      const g = Math.floor(Math.random() * 120) + 60;
+      const b = Math.floor(Math.random() * 120) + 60;
+      await sharp({
+        create: { width: 1800, height: 1200, channels: 3, background: { r, g, b } },
+      }).jpeg().toFile(filepath);
+      return filepath;
+    }
+    // Note: shutterDelayMs is applied client-side (fires this request early, ahead of the
+    // on-screen countdown reaching 0) rather than here — see CapturePage.jsx.
+    await execAsync(`gphoto2 --capture-image-and-download --filename "${filepath}" --force-overwrite`);
     return filepath;
-  }
-  // Note: shutterDelayMs is applied client-side (fires this request early, ahead of the
-  // on-screen countdown reaching 0) rather than here — see CapturePage.jsx.
-  await execAsync(`gphoto2 --capture-image-and-download --filename "${filepath}" --force-overwrite`);
-  return filepath;
+  });
 }
 
 // Build a 2x6 collage strip from N images
@@ -601,6 +725,10 @@ async function renderStripTemplateLayered({ width, height, backgroundColor, cont
 
 async function persistConfig() {
   await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2));
+  if (!shouldUseDslrPreview()) {
+    await stopDslrPreviewStream();
+    closeDslrPreviewClients();
+  }
   broadcast({ event: 'config_updated' });
 }
 
@@ -623,7 +751,11 @@ app.get('/config', (req, res) => {
     single: config.single,
     gallery: config.gallery,
     booth: config.booth,
-    camera: { shutterDelayMs: config.camera?.shutterDelayMs ?? 0 },
+    camera: {
+      shutterDelayMs: config.camera?.shutterDelayMs ?? 0,
+      simulateCapture: config.camera?.simulateCapture ?? false,
+      previewSource: getPreviewSource(),
+    },
     template: { enabled: config.template?.enabled ?? false },
     print: {
       enabled: config.print.enabled,
@@ -646,6 +778,43 @@ app.post('/capture/single', async (req, res) => {
     broadcast({ event: 'error', message: 'Capture failed' });
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+app.get('/camera/stream.mjpg', (req, res) => {
+  if (getPreviewSource() !== 'dslr') {
+    return res.status(409).send('DSLR preview is not enabled');
+  }
+  if (config.camera?.simulateCapture) {
+    return res.status(409).send('Disable simulate camera to use DSLR preview');
+  }
+
+  res.writeHead(200, {
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
+    Connection: 'close',
+    'Content-Type': `multipart/x-mixed-replace; boundary=${DSLR_STREAM_BOUNDARY}`,
+  });
+
+  dslrPreviewClients.add(res);
+  startDslrPreviewStream();
+
+  req.on('close', () => {
+    dslrPreviewClients.delete(res);
+    res.end();
+    if (dslrPreviewClients.size === 0) stopDslrPreviewStream();
+  });
+});
+
+app.get('/camera/healthz', (req, res) => {
+  res.json({
+    ok: true,
+    previewSource: getPreviewSource(),
+    simulateCapture: config.camera?.simulateCapture ?? false,
+    streaming: Boolean(dslrPreviewProcess),
+    capturing: captureInFlight,
+    clients: dslrPreviewClients.size,
+  });
 });
 
 // POST /capture/shot - capture one shot for a collage (frontend controls timing)
@@ -925,6 +1094,18 @@ function deepMerge(target, source) {
     }
   }
   return result;
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
+function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  stopDslrPreviewStream().finally(() => {
+    closeDslrPreviewClients();
+    server.close(() => process.exit(0));
+  });
 }
 
 // WebSocket connection

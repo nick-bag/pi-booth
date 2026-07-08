@@ -5,6 +5,7 @@ import AdminPage from './pages/AdminPage.jsx';
 import { usePhotobooth, apiConfig } from './hooks/usePhotobooth.js';
 
 const VIEWS = { START: 'start', CAPTURE: 'capture', ADMIN: 'admin' };
+const DSLR_STREAM_URL = '/api/camera/stream.mjpg';
 
 export default function App() {
   const [view, setView] = useState(VIEWS.START);
@@ -17,9 +18,25 @@ export default function App() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [camReady, setCamReady] = useState(false);
+  const previewSource = !config
+    ? null
+    : (config.camera?.simulateCapture ? 'client' : (config.camera?.previewSource ?? 'client'));
 
   useEffect(() => {
+    if (!previewSource) {
+      setCamReady(false);
+      return;
+    }
+    if (previewSource !== 'client') {
+      setCamReady(false);
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+      return;
+    }
+
     let cancelled = false;
+    setCamReady(false);
     navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'user' }, audio: false })
       .then((stream) => {
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
@@ -31,8 +48,10 @@ export default function App() {
     return () => {
       cancelled = true;
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
     };
-  }, []);
+  }, [previewSource]);
   usePhotobooth((event) => {
     if (event.event === 'config_updated') {
       apiConfig().then(setConfig).catch(console.error);
@@ -86,18 +105,34 @@ export default function App() {
           config?.booth?.matchDslrAspect && 'appVideoFrameAspect',
         ].filter(Boolean).join(' ')}
       >
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className={[
-            'appVideo',
-            camReady && 'appVideoReady',
-            (config?.booth?.mirrorLivePreview ?? true) && 'appVideoMirrored',
-          ].filter(Boolean).join(' ')}
-          style={{ '--app-video-scale': previewZoom }}
-        />
+        {previewSource === 'client' ? (
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className={[
+              'appPreviewMedia',
+              camReady && 'appPreviewReady',
+              (config?.booth?.mirrorLivePreview ?? true) && 'appPreviewMirrored',
+            ].filter(Boolean).join(' ')}
+            style={{ '--app-video-scale': previewZoom }}
+          />
+        ) : previewSource === 'dslr' ? (
+          <img
+            key={previewSource}
+            src={DSLR_STREAM_URL}
+            alt=""
+            onLoad={() => setCamReady(true)}
+            onError={() => setCamReady(false)}
+            className={[
+              'appPreviewMedia',
+              camReady && 'appPreviewReady',
+              (config?.booth?.mirrorLivePreview ?? true) && 'appPreviewMirrored',
+            ].filter(Boolean).join(' ')}
+            style={{ '--app-video-scale': previewZoom }}
+          />
+        ) : null}
       </div>
       <div className="appContent">
         {pageContent}

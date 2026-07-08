@@ -16,7 +16,7 @@ A DIY photo booth built for events and weddings, running on a Raspberry Pi 4 wit
 - **Photo strip** mode — 3-shot collage (2x6 strip at 300dpi)
   - Live countdown between each shot
   - Preview of each shot before the next countdown
-- **Live camera preview** — iPad front camera shown as fullscreen background
+- **Live camera preview** — switch between the iPad camera and Nikon DSLR live view
 - **Auto-return** to home screen after photo is taken (configurable delay, 0 = disabled)
 - **Auto-print** — when printing is enabled, prints automatically after capture (no button)
 - **Photo template overlay** — composites couple name/date onto photos at print time (non-destructive, original file untouched)
@@ -30,7 +30,7 @@ A DIY photo booth built for events and weddings, running on a Raspberry Pi 4 wit
 |-----------|---------|
 | Pi | Raspberry Pi 4 (2GB) |
 | Camera | Nikon D3300 via USB (gPhoto2) |
-| Client | iPad (PWA, front camera for live preview) |
+| Client | iPad (PWA, using either the front camera or DSLR live view) |
 | Printer | DNP DS-RX1H (CUPS) |
 
 ### Pi Dependencies
@@ -94,6 +94,7 @@ Edit `server/config.json` with your event details. At minimum set:
 ```json
 {
   "camera": {
+    "previewSource": "client",
     "simulateCapture": true
   },
   "print": {
@@ -103,7 +104,7 @@ Edit `server/config.json` with your event details. At minimum set:
 }
 ```
 
-Set `simulateCapture: false` on the Pi when the camera is connected.
+Set `simulateCapture: false` on the Pi when the camera is connected. Set `previewSource: "dslr"` to use the Nikon live preview stream in the main booth UI; the server will stop that stream briefly during each capture and restart it automatically afterward.
 
 ### 3. Development
 
@@ -148,6 +149,7 @@ Access everything at `http://<pi-ip>` (no port number needed).
 
 | Key | Description |
 |-----|-------------|
+| `camera.previewSource` | `client` uses the iPad camera for live preview; `dslr` uses the Nikon live preview stream |
 | `camera.simulateCapture` | Use a placeholder image instead of triggering gPhoto2 |
 | `camera.shutterDelayMs` | Fires the capture request this many ms *before* the on-screen countdown hits 0 — compensates for camera/USB shutter lag so the shot lands right on "0" |
 | `print.enabled` | Auto-print after every capture |
@@ -158,7 +160,7 @@ Access everything at `http://<pi-ip>` (no port number needed).
 | `collage.shotPreviewSeconds` | How long each shot preview is shown |
 | `single.countdownSeconds` | Countdown duration for single photos |
 | `booth.autoReturnSeconds` | Seconds before auto-returning home (0 = disabled) |
-| `booth.matchDslrAspect` | Crops the iPad's live preview to a 2:3 portrait box (matching the DSLR photo) instead of filling the whole screen |
+| `booth.matchDslrAspect` | Crops the live preview to a 2:3 portrait box (matching the DSLR photo) instead of filling the whole screen |
 | `template.enabled` | Apply text overlay at print time |
 | `template.imageFilename` | Uploaded full-strip overlay image for collage prints |
 | `template.imagePlacement` | Whether uploaded strip art sits under or over strip photos |
